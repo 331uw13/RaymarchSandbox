@@ -1,2 +1,2 @@
 # RaymarchSandbox
-Helpful program to code shaders with.
+i wrote this tool to have its own integrated GLSL library with helpful functions for raymarching. (Work in progress)
