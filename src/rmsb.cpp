@@ -28,7 +28,10 @@ void RMSB::init() {
     this->file_read_timer = 0.0f;
     this->shader_loaded = false;
     this->gui.init();
-
+    this->show_fps = true;
+    this->fov = 30.0;
+    this->hit_distance = 0.00005;
+    this->max_ray_len = 200.0;
     printf(
             "<TAB>  Fullscreen\n"
             "<F>    Gui\n"
@@ -79,8 +82,16 @@ void RMSB::render_shader() {
     }
 
     const float ftime = (float)this->time;
+    Vector2 screen_size = (Vector2) {
+        GetScreenWidth(), GetScreenHeight()
+    };
+
     BeginShaderMode(this->shader);
     SetShaderValue(this->shader, GetShaderLocation(this->shader, "time"), &ftime, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(this->shader, GetShaderLocation(this->shader, "FOV"), &this->fov, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(this->shader, GetShaderLocation(this->shader, "HIT_DISTANCE"), &this->hit_distance, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(this->shader, GetShaderLocation(this->shader, "MAX_RAY_LENGTH"), &this->max_ray_len, SHADER_UNIFORM_FLOAT);
+    SetShaderValueV(this->shader, GetShaderLocation(this->shader, "screen_size"), &screen_size, SHADER_UNIFORM_VEC2, 1);
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), WHITE);
     EndShaderMode();
 }

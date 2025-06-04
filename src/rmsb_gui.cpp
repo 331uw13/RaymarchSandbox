@@ -38,6 +38,8 @@ void RMSBGui::init() {
     colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.43f, 0.16f, 0.29f, 1.00f);
     colors[ImGuiCol_SliderGrab]             = ImVec4(0.27f, 0.44f, 0.32f, 1.00f);
 
+    this->view_functions = false;
+    this->view_ilibsrc = false;
     this->open = true;
 }
 
@@ -76,7 +78,7 @@ void RMSBGui::render(RMSB* rmsb) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
     ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImVec2(400, 500));
+    ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, GUI_HEIGHT));
     ImGui::Begin("Gui", NULL, 
           ImGuiWindowFlags_NoMove
         | ImGuiWindowFlags_NoDecoration);
@@ -91,9 +93,14 @@ void RMSBGui::render(RMSB* rmsb) {
             rmsb->reload_shader();
         }
 
-        ImGui::SameLine();
         ImGui::Checkbox("View functions", &this->view_functions);
+        ImGui::Checkbox("Show FPS", &rmsb->show_fps);
+        
+        ImGui::SeparatorText("Render settings");
 
+        ImGui::SliderFloat("##FOV", &rmsb->fov, 10.0, 120.0, "Field of view: %f");
+        ImGui::SliderFloat("##HITDISTANCE", &rmsb->hit_distance, 0.000005, 0.001, "Hit distance: %f");
+        ImGui::SliderFloat("##MAXRAYLEN", &rmsb->max_ray_len, 10.0, 3000.0, "Max ray length: %0.2f");
 
         ImGui::SeparatorText("Time settings");
    
@@ -109,7 +116,7 @@ void RMSBGui::render(RMSB* rmsb) {
             rmsb->time_mult = 1.0f;
         }
         ImGui::SameLine();
-        ImGui::SliderFloat("##GlobalTimeScale", &rmsb->time_mult, 0.001, 10.0, "Global time scale: %0.3f");
+        ImGui::SliderFloat("##GlobalTimeScale", &rmsb->time_mult, -10.0, 10.0, "Global time scale: %0.3f");
 
 
         /*
@@ -133,18 +140,27 @@ void RMSBGui::render(RMSB* rmsb) {
 
     }
     ImGui::End();
-    
+   
     if(this->view_functions) {
         InternalLib& ilib = InternalLib::get_instance();
-        ImGui::Begin("Functions");
+        ImGui::SetNextWindowPos(ImVec2(GetScreenWidth()-FUNCTIONS_VIEW_WIDTH, 0));
+        ImGui::SetNextWindowSize(ImVec2(FUNCTIONS_VIEW_WIDTH, GetScreenHeight()));
+        ImGui::Begin("Functions", NULL, 
+                ImGuiWindowFlags_NoDecoration
+               | ImGuiWindowFlags_NoMove);
         ImGui::SetWindowFontScale(1.0);
         int counter = 0;
-        for(struct func_t func : ilib.functions) {
-            if(ImGui::CollapsingHeader(func.name.c_str())) {
+        for(struct document_t document : ilib.documents) {
+            if(ImGui::CollapsingHeader(document.name.c_str())) {
                 ImGui::PushID(counter);
-                ImGui::Text(func.desc.c_str());
+                ImGui::Text(document.desc.c_str());
                 if(ImGui::TreeNode("Source")) {
-                    ImGui::InputTextMultiline("##SOURCE", (char*)func.code.c_str()+'\0', ImGuiInputTextFlags_ReadOnly);
+
+                    const float draw_height = (document.num_newlines+2) * ImGui::GetFontSize();
+                    ImGui::InputTextMultiline("##SOURCE", 
+                            (char*)document.code.c_str()+'\0', document.code.size()+1,
+                            ImVec2(FUNCTIONS_VIEW_WIDTH-50, draw_height), 
+                            ImGuiInputTextFlags_ReadOnly);
                     ImGui::TreePop();
                 }
                 ImGui::PopID();

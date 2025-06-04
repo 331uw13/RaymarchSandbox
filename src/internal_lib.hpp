@@ -5,10 +5,11 @@
 #include <list>
 
 
-struct func_t {
+struct document_t {
     std::string code;
     std::string desc;
     std::string name;
+    size_t num_newlines; // Used for rendering the text field correct size.
 };
 
 class InternalLib {
@@ -19,11 +20,11 @@ class InternalLib {
         }
         
         void create_source();
-        void add_func(const char* code, const char* description);
+        void add_document(const char* code, const char* description);
         const std::string get_source();
         const char* get_vertex_src();
 
-        std::list<struct func_t> functions;
+        std::list<struct document_t> documents;
 
     // Avoid accidental copies.
     InternalLib(InternalLib const&) = delete;

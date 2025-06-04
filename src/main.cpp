@@ -13,7 +13,10 @@ void key_inputs(RMSB* rmsb) {
     if(IsKeyPressed(KEY_F)) {
         rmsb->gui.open = !rmsb->gui.open;
     }
-    
+   
+    if(IsKeyPressed(KEY_R)) {
+        rmsb->reload_shader();
+    }
 
 
 }
@@ -32,6 +35,9 @@ void loop(RMSB* rmsb) {
         rmsb->gui.update();
         rmsb->gui.render(rmsb);
 
+        if(rmsb->show_fps) {
+            DrawFPS(10, GetScreenHeight()-20);
+        }
 
         EndDrawing();
     }

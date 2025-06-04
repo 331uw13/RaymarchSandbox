@@ -15,6 +15,7 @@ class RMSB {
     public:
         Shader shader;
         bool shader_loaded;
+        bool show_fps;
 
         std::string shader_filepath;
 
@@ -23,6 +24,10 @@ class RMSB {
         bool time_paused;
         
         float file_read_timer;
+    
+        float fov;
+        float hit_distance;
+        float max_ray_len;
 
         RMSBGui gui;
 
