@@ -32,9 +32,11 @@ void loop(RMSB* rmsb) {
         rmsb->render_shader();
         
         rmsb->update();
+        rmsb->render_infolog();
         rmsb->gui.update();
         rmsb->gui.render(rmsb);
 
+       
         if(rmsb->show_fps) {
             DrawFPS(10, GetScreenHeight()-20);
         }

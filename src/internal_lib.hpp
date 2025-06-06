@@ -26,9 +26,9 @@ class InternalLib {
 
         std::list<struct document_t> documents;
 
-    // Avoid accidental copies.
-    InternalLib(InternalLib const&) = delete;
-    void operator=(InternalLib const&) = delete;
+        // Avoid accidental copies.
+        InternalLib(InternalLib const&) = delete;
+        void operator=(InternalLib const&) = delete;
 
 
     private:

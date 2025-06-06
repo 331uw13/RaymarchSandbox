@@ -39,7 +39,6 @@ void RMSBGui::init() {
     colors[ImGuiCol_SliderGrab]             = ImVec4(0.27f, 0.44f, 0.32f, 1.00f);
 
     this->view_functions = false;
-    this->view_ilibsrc = false;
     this->open = true;
 }
 
@@ -74,80 +73,94 @@ void RMSBGui::render(RMSB* rmsb) {
     if(!this->open) {
         return;
     }
-
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, GUI_HEIGHT));
-    ImGui::Begin("Gui", NULL, 
-          ImGuiWindowFlags_NoMove
-        | ImGuiWindowFlags_NoDecoration);
-    {
-        //ImGui::ShowDemoWindow();
+
+    if(this->open) {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, GUI_HEIGHT));
+        ImGui::Begin("Gui", NULL, 
+              ImGuiWindowFlags_NoMove
+            | ImGuiWindowFlags_NoTitleBar
+            | ImGuiWindowFlags_NoResize);
+        {
+            //ImGui::ShowDemoWindow();
+
+            ImGui::SetWindowFontScale(1.2);
+       
+            ImGui::Text("File:'%s'", rmsb->shader_filepath.c_str());
+            if(ImGui::Button("Reload")) {
+                rmsb->reload_shader();
+            }
+
+            ImGui::Checkbox("View functions", &this->view_functions);
+            ImGui::Checkbox("Show FPS", &rmsb->show_fps);
+            ImGui::Checkbox("Show Infolog", &rmsb->show_infolog);
+            ImGui::SeparatorText("Render settings");
+
+            ImGui::SliderFloat("##FIELD_OF_VIEW", 
+                    &rmsb->fov, 10.0, 120.0,
+                    "Field of view: %f");
+
+            ImGui::SliderFloat("##HIT_DISTANCE",
+                    &rmsb->hit_distance, 0.000001, 0.001,
+                    "Hit distance: %f");
+
+            ImGui::SliderFloat("##MAX_RAY_LENGTH",
+                    &rmsb->max_ray_len, 10.0, 3000.0,
+                    "Max ray length: %0.2f");
+
+            ImGui::SeparatorText("Time settings");
+       
+            if(ImGui::Button("Reset Time")) {
+                rmsb->time = 0.0;
+            }
+            ImGui::SameLine();
+            ImGui::Checkbox("Pause", &rmsb->time_paused);
+            ImGui::SameLine();
+            ImGui::Text("| %0.2f", rmsb->time);
+        
+            if(ImGui::Button("Reset")) {
+                rmsb->time_mult = 1.0f;
+            }
+            ImGui::SameLine();
+            ImGui::SliderFloat("##GLOBAL_TIME_SCALE",
+                    &rmsb->time_mult, -10.0, 10.0,
+                    "Global time scale: %0.3f");
+
+            ImGui::Checkbox("Reset time on reload", &rmsb->reset_time_on_reload);
+
+            /*
+            ImGui::SeparatorText("Compile settings");
+            // TODO: Auto compile.
+            
+            ImGui::SeparatorText("Custom uniforms");
+            // TODO: Easily programmable timelines.
+            
+            ImGui::SeparatorText("Textures");
+            // TODO: Easily programmable timelines.
+            
+            ImGui::SeparatorText("Camera settings");
+            // TODO: 3D view toggle.
+
+            ImGui::SeparatorText("Timeline settings");
+            // TODO: Easily programmable timelines.
+            */
 
 
-        ImGui::SetWindowFontScale(1.2);
-   
-        ImGui::Text("File:'%s'", rmsb->shader_filepath.c_str());
-        if(ImGui::Button("Reload")) {
-            rmsb->reload_shader();
         }
-
-        ImGui::Checkbox("View functions", &this->view_functions);
-        ImGui::Checkbox("Show FPS", &rmsb->show_fps);
-        
-        ImGui::SeparatorText("Render settings");
-
-        ImGui::SliderFloat("##FOV", &rmsb->fov, 10.0, 120.0, "Field of view: %f");
-        ImGui::SliderFloat("##HITDISTANCE", &rmsb->hit_distance, 0.000005, 0.001, "Hit distance: %f");
-        ImGui::SliderFloat("##MAXRAYLEN", &rmsb->max_ray_len, 10.0, 3000.0, "Max ray length: %0.2f");
-
-        ImGui::SeparatorText("Time settings");
-   
-        if(ImGui::Button("Reset Time")) {
-            rmsb->time = 0.0;
-        }
-        ImGui::SameLine();
-        ImGui::Checkbox("Pause", &rmsb->time_paused);
-        ImGui::SameLine();
-        ImGui::Text("| %0.2f", rmsb->time);
-    
-        if(ImGui::Button("Reset")) {
-            rmsb->time_mult = 1.0f;
-        }
-        ImGui::SameLine();
-        ImGui::SliderFloat("##GlobalTimeScale", &rmsb->time_mult, -10.0, 10.0, "Global time scale: %0.3f");
-
-
-        /*
-        ImGui::SeparatorText("Compile settings");
-        // TODO: Auto compile.
-        
-        ImGui::SeparatorText("Custom uniforms");
-        // TODO: Easily programmable timelines.
-        
-        ImGui::SeparatorText("Textures");
-        // TODO: Easily programmable timelines.
-        
-        ImGui::SeparatorText("Camera settings");
-        // TODO: 3D view toggle.
-
-        ImGui::SeparatorText("Timeline settings");
-        // TODO: Easily programmable timelines.
-        */
-
-        ImGui::Checkbox("View InternalLib", &this->view_ilibsrc);
-
+        ImGui::End();
     }
-    ImGui::End();
    
     if(this->view_functions) {
         InternalLib& ilib = InternalLib::get_instance();
         ImGui::SetNextWindowPos(ImVec2(GetScreenWidth()-FUNCTIONS_VIEW_WIDTH, 0));
         ImGui::SetNextWindowSize(ImVec2(FUNCTIONS_VIEW_WIDTH, GetScreenHeight()));
         ImGui::Begin("Functions", NULL, 
-                ImGuiWindowFlags_NoDecoration
-               | ImGuiWindowFlags_NoMove);
+                  ImGuiWindowFlags_NoMove
+                | ImGuiWindowFlags_NoTitleBar
+                | ImGuiWindowFlags_NoResize
+               );
         ImGui::SetWindowFontScale(1.0);
         int counter = 0;
         for(struct document_t document : ilib.documents) {
@@ -171,19 +184,15 @@ void RMSBGui::render(RMSB* rmsb) {
     }
 
 
-    // TODO: REMOVE LATER
-    if(this->view_ilibsrc) {
-        ImGui::Begin("View Library Source");
-        InternalLib& ilib = InternalLib::get_instance();
-        std::string source = ilib.get_source();
-        ImGui::InputTextMultiline("##InternalLibSource", (char*)source.c_str()+'\0',
-                ImGuiInputTextFlags_ReadOnly);
-        ImGui::End();
+    ErrorLog& log = ErrorLog::get_instance();
+    if(!log.empty()) {
+        log.render();
     }
-
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+   
+
 }
 
 

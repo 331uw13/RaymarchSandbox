@@ -7,6 +7,24 @@
 
 
 
+static bool g_listen_shader_log = false;
+
+
+
+static void tracelog_callback(int log_level, const char* text, va_list args) {
+#define BUF_SIZE 4096
+    char buf[BUF_SIZE] = { 0 };
+    vsnprintf(buf, BUF_SIZE, text, args);
+    puts(buf);
+
+    if(g_listen_shader_log
+    && (log_level == LOG_WARNING || log_level == LOG_ERROR)) {
+        ErrorLog& log = ErrorLog::get_instance();
+        log.add(buf);
+    }
+
+}
+
 void RMSB::init() {
     printf("%s\n", __func__);
 
@@ -18,10 +36,19 @@ void RMSB::init() {
     SetWindowMinSize(200, 200);
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(300);
-
+    SetExitKey(0);
 
     m_winsize_nf = (Vector2){ DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT };
     m_fullscreen = false;
+    m_infolog_size = 0;
+    m_first_shader_load = true;
+
+    for(size_t i = 0; i < INFO_ARRAY_MAX_SIZE; i++) {
+        m_infolog[i].enabled = 0;
+    }
+
+    this->show_infolog = true;
+    this->reset_time_on_reload = true;
     this->time_paused = false;
     this->time_mult = 1.0f;
     this->time = 0.0;
@@ -37,7 +64,10 @@ void RMSB::init() {
             "<F>    Gui\n"
             "<R>    Reload shader\n"
             );
+
+    SetTraceLogCallback(tracelog_callback);
 }
+
 
 void RMSB::quit() {
     printf("%s\n", __func__);
@@ -83,7 +113,7 @@ void RMSB::render_shader() {
 
     const float ftime = (float)this->time;
     Vector2 screen_size = (Vector2) {
-        GetScreenWidth(), GetScreenHeight()
+        (float)GetScreenWidth(), (float)GetScreenHeight()
     };
 
     BeginShaderMode(this->shader);
@@ -110,13 +140,17 @@ void RMSB::reload_shader() {
                 __func__, file);
         return;
     }
+   
+    ErrorLog::get_instance().clear();
+    g_listen_shader_log = true;
 
     char* data = LoadFileText(file);
     std::string code = InternalLib::get_instance().get_source() + data;
-   
-    this->shader = LoadShaderFromMemory(0, code.c_str() + '\0');
+    code += '\0';
+
+    this->shader = LoadShaderFromMemory(0, code.c_str());
+    //printf("%i\n", this->shader.id);
     printf("\033[90m%s\033[0m\n", code.c_str());
-    printf("%i\n", this->shader.id);
 
     if(this->shader.id > 0) {
         this->shader_loaded = true;
@@ -124,7 +158,77 @@ void RMSB::reload_shader() {
 
     UnloadFileText(data);
 
+    if(this->reset_time_on_reload) {
+        this->time = 0;
+    }
+    g_listen_shader_log = false;
 
+    if(IsShaderValid(this->shader)) {
+        loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
+        m_first_shader_load = false;
+    }
+}
+
+void RMSB::loginfo(Color color, const char* text, ...) {
+#define LOGINFO_BUF_SIZE 64
+    va_list args;
+    va_start(args, text);
+
+    if(m_infolog_size+1 >= INFO_ARRAY_MAX_SIZE) {
+        fprintf(stderr, "'%s': Info array is full\n",
+                __func__);
+        return;
+    }
+
+    
+    char buf[LOGINFO_BUF_SIZE] = { 0 };
+    vsnprintf(buf, LOGINFO_BUF_SIZE, text, args);
+
+    va_end(args);
+
+
+    struct infotext_t info = (struct infotext_t) {
+        .data = buf,
+        .color = color,
+        .timer = 1.0,
+        .enabled = 1
+    };
+
+
+    // Shift to right
+    for(size_t i = INFO_ARRAY_MAX_SIZE-1; i > 0; i--) {
+        m_infolog[i] = m_infolog[i-1];
+    }
+
+    m_infolog[0] = info;
 }
         
+
+void RMSB::render_infolog() {
+    if(!this->show_infolog) { 
+        return;
+    }
+    int X = 10;
+    int Y = (this->gui.open ? GUI_HEIGHT : 0) + 10;
+
+
+    struct infotext_t* info = NULL;
+    for(size_t i = 0; i < INFO_ARRAY_MAX_SIZE; i++) {
+        info = &m_infolog[i];
+        if(!info->enabled) {
+            continue;
+        }
+
+        info->color.a = info->timer * 255;
+        DrawText(info->data.c_str(), X, Y, 20, info->color);
+
+        Y += 25;
+
+        info->timer -= GetFrameTime() * 0.5;
+        if(info->timer < 0.0) {
+            info->enabled = 0;
+        }
+    }
+}
+
 

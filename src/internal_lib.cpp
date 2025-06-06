@@ -5,7 +5,7 @@
 #include "imgui.h"
 #include "internal_lib.hpp"
 
-#define GLSL_VERSION "#version 330\n"
+#define GLSL_VERSION "#version 430\n"
 
 void InternalLib::create_source() {
     this->source += GLSL_VERSION;
@@ -19,7 +19,6 @@ void InternalLib::create_source() {
     this->source += "#define PI2 (PI*2.0)\n";
     this->source += "#define PI_R (PI/180.0)\n";
 
-
     // Shape must have:
     // - Diffuse, Specular
     // - Distance.
@@ -31,12 +30,23 @@ void InternalLib::create_source() {
 
     const char* MATERIAL_DEFINITIONS = 
         "#define Material mat3x3\n"
-        "#define Mdiffuse(x) x[0]\n"
+        "#define Mdiffuse(x)  x[0]\n"
         "#define Mspecular(x) x[1]\n"
         "#define Mdistance(x) x[2][0]\n"
+        "#define Mshine(x)    x[2][1]\n"
         ;
 
     this->source += MATERIAL_DEFINITIONS;
+
+    add_document(
+            "struct CAMERA_T\n"
+            "{\n"
+            "   vec3 pos;\n"
+            "   vec3 dir;\n"
+            "} CAMERA;\n"
+            ,
+            "..."
+            );
 
     add_document(
             "struct RAYRESULT_T\n"
@@ -49,7 +59,6 @@ void InternalLib::create_source() {
             ,
             "'RAYMARCH(..)' functions set these global variables.\n"
             );
-
 
     add_document(
             "Material map(vec3 p);"
@@ -83,7 +92,6 @@ void InternalLib::create_source() {
             ,
             "Returns a pseudo random number.\n"
             );
-
 
     add_document(
             "vec3 RAYDIR()\n"
@@ -139,6 +147,26 @@ void InternalLib::create_source() {
             ,
             "This function will output normal for given point 'p'\n"
             "by sampling the same point but slightly different offsets.\n"
+            );
+
+    add_document(
+            "vec3 COMPUTE_LIGHT(vec3 light_pos, vec3 color, vec3 normal, vec3 ray_pos, Material m)\n"
+            "{\n"
+            "   vec3 light_dir = normalize(light_pos - ray_pos);\n"
+            "   vec3 view_dir = normalize(CAMERA.pos - ray_pos);\n"
+            "   vec3 halfway_dir = normalize(light_dir - view_dir);\n"
+            "   float nh_dot = max(dot(normal, halfway_dir), 0.0);\n"
+            "   float shine = 32 - clamp(Mshine(m), 0, 32);\n"
+            "   vec3 specular = color * pow(nh_dot, shine);\n"
+            "   float diffuse = max(dot(normal, light_dir), 0.0);\n"
+            "   return (specular * Mspecular(m) + diffuse) * Mdiffuse(m);\n"
+            "}\n"
+            ,
+            "Returns color for the pixel.\n"
+            "Notes:\n"
+            " - Ambient color is not set by this function.\n"
+            " - Material must be valid.\n"
+            " - CAMERA.pos should be where 'ray origin' is.\n"
             );
 
     // https://iquilezles.org/articles/distfunctions/
