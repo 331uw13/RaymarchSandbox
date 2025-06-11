@@ -1,6 +1,9 @@
 # RaymarchSandbox
-(Work in progress)
+* Built-in functions for raymarching
+* Text editor
+* Custom uniform inputs.
 
+work in progress :)
 
 ## Compiling
 ```bash
