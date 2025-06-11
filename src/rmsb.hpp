@@ -7,10 +7,13 @@
 #include "rmsb_gui.hpp"
 #include "internal_lib.hpp"
 #include "error_log.hpp"
+#include "editor.hpp"
 
 #define DEFAULT_WIN_WIDTH 1200
 #define DEFAULT_WIN_HEIGHT 800
 
+#define STARTUP_CMD_BEGIN_TAG "@startup_cmd"
+#define STARTUP_CMD_END_TAG   "@end"
 
 #define INFO_ARRAY_MAX_SIZE 32
 
@@ -68,6 +71,16 @@ class RMSB {
         
         struct infotext_t m_infolog[INFO_ARRAY_MAX_SIZE];
         size_t m_infolog_size;
+
+        // On first load need to add the uniforms that are in.
+        // @startup_command .... @end  region.
+        void run_shader_startup_cmd(const std::string* shader_code);
+        void proccess_shader_startup_cmd_line(const std::string* code_line);
+
+        // @startup_command  and @end are not valid glsl code.
+        // they must be removed after reading.
+        void remove_startup_cmd_blocks(std::string* shader_code);
+
 
 };
 

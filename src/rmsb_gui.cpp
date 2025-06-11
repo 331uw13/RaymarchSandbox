@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <stdio.h>
+#include <GLFW/glfw3.h>
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -8,6 +9,12 @@
 
 #include "rmsb_gui.hpp"
 #include "rmsb.hpp"
+#include "util.hpp"
+
+#include "gui_tabs/uniforms_tab.hpp"
+#include "gui_tabs/settings_tab.hpp"
+#include "gui_tabs/editor_tab.hpp"
+
 
 void RMSBGui::init() {
     ImGui::CreateContext();
@@ -18,7 +25,8 @@ void RMSBGui::init() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.DisplaySize = ImVec2(DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT);
-
+    
+    //glfwSetCharCallback((GLFWwindow*)GetWindowHandle(), ImGui_ImplGlfw_CharCallback);
     ImGui::StyleColorsDark();
 
     ImVec4* colors = ImGui::GetStyle().Colors;
@@ -66,8 +74,18 @@ void RMSBGui::update() {
 
     io.MouseWheel += GetMouseWheelMove();
 
-}
+    char input_char = GetCharPressed();
+    if(input_char != 0) {
+        io.AddInputCharacter(input_char);
+        Editor::get_instance().char_input = input_char;
+    }
 
+    // TODO: Add support for holding keys down.
+    io.AddKeyEvent(ImGuiKey_Backspace, IsKeyPressed(KEY_BACKSPACE));
+    io.AddKeyEvent(ImGuiKey_LeftArrow, IsKeyPressed(KEY_LEFT));
+    io.AddKeyEvent(ImGuiKey_RightArrow, IsKeyPressed(KEY_RIGHT));
+}   
+    
 
 void RMSBGui::render(RMSB* rmsb) {
     if(!this->open) {
@@ -75,6 +93,8 @@ void RMSBGui::render(RMSB* rmsb) {
     }
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
+
+    //ImGui::ShowDemoWindow();
 
     if(this->open) {
         ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -86,49 +106,48 @@ void RMSBGui::render(RMSB* rmsb) {
         {
             //ImGui::ShowDemoWindow();
 
-            ImGui::SetWindowFontScale(1.2);
+
+            if(ImGui::BeginTabBar("##SETTINGS_TAB")) {
+                
+                if(ImGui::BeginTabItem("General")) {
+                    SettingsTab::render(rmsb);
+                    ImGui::EndTabItem();
+                }
+                if(ImGui::BeginTabItem("Uniform Input")) {
+                    UniformsTab::render(rmsb);
+                    ImGui::EndTabItem();
+                }
+                if(ImGui::BeginTabItem("GLSL Editor")) {
+                    EditorSettingsTab::render(rmsb);
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
        
-            ImGui::Text("File:'%s'", rmsb->shader_filepath.c_str());
-            if(ImGui::Button("Reload")) {
-                rmsb->reload_shader();
+            //SettingsTab::render(rmsb);
+            //UniformsTab::render(rmsb);
+
+
+
+
+            /*
+            if(ImGui::TreeNode("Inputs")) {
+
+                static char name_buf[32] = { 0 };
+
+                ImGui::Text("Uniform name:");
+                ImGui::SetKeyboardFocusHere();
+                ImGui::InputText("##UNIFORM_NAME", name_buf, sizeof(name_buf)-1);
+                ImGui::SameLine();
+                if(ImGui::Button("Add uniform")) {
+                    printf("Add '%s' | <type?>\n", name_buf);
+                }
+
+           
+                ImGui::TreePop();
             }
+            */
 
-            ImGui::Checkbox("View functions", &this->view_functions);
-            ImGui::Checkbox("Show FPS", &rmsb->show_fps);
-            ImGui::Checkbox("Show Infolog", &rmsb->show_infolog);
-            ImGui::SeparatorText("Render settings");
-
-            ImGui::SliderFloat("##FIELD_OF_VIEW", 
-                    &rmsb->fov, 10.0, 120.0,
-                    "Field of view: %f");
-
-            ImGui::SliderFloat("##HIT_DISTANCE",
-                    &rmsb->hit_distance, 0.000001, 0.001,
-                    "Hit distance: %f");
-
-            ImGui::SliderFloat("##MAX_RAY_LENGTH",
-                    &rmsb->max_ray_len, 10.0, 3000.0,
-                    "Max ray length: %0.2f");
-
-            ImGui::SeparatorText("Time settings");
-       
-            if(ImGui::Button("Reset Time")) {
-                rmsb->time = 0.0;
-            }
-            ImGui::SameLine();
-            ImGui::Checkbox("Pause", &rmsb->time_paused);
-            ImGui::SameLine();
-            ImGui::Text("| %0.2f", rmsb->time);
-        
-            if(ImGui::Button("Reset")) {
-                rmsb->time_mult = 1.0f;
-            }
-            ImGui::SameLine();
-            ImGui::SliderFloat("##GLOBAL_TIME_SCALE",
-                    &rmsb->time_mult, -10.0, 10.0,
-                    "Global time scale: %0.3f");
-
-            ImGui::Checkbox("Reset time on reload", &rmsb->reset_time_on_reload);
 
             /*
             ImGui::SeparatorText("Compile settings");

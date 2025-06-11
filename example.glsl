@@ -1,12 +1,13 @@
 
 
+
 Material map(vec3 p) {
     Material test = Material(0);
 
-    Mdistance(test) = SPHERE_SDF(p, 0.5);
-    Mdiffuse(test) = vec3(0.4, 0.8, 0.4);
+    Mdistance(test) = SphereSDF(p, 0.5);
+    Mdiffuse(test) = vec3(test_color);
     Mshine(test) = 3.0;
-    Mspecular(test) = vec3(0.3);
+    Mspecular(test) = vec3(test_value*20.0);
 
     return test;
 }
@@ -15,30 +16,39 @@ Material map(vec3 p) {
 
 void main() {
     vec3 color = vec3(0);
+    vec3 ro = vec3(0, 0, -8.0);
+    vec3 rd = RayDir(); 
 
-    CAMERA.pos = vec3(0, 0, -8.0);
-    CAMERA.dir = RAYDIR(); 
 
+    Camera.pos = ro;
+    Raymarch(ro, rd);
 
-    RAYMARCH(CAMERA.pos, CAMERA.dir);
-
-    if(RAY_RESULT.hit == 1) {
-        vec3 normal = COMPUTE_NORMAL(RAY_RESULT.pos);
-        vec3 light = COMPUTE_LIGHT(
-                vec3(cos(time*3.0)*8.0, cos(time)*10.0, sin(time)*4.0),
-                vec3(0.8, 0.7, 0.5),
+    if(Ray.hit == 1) {
+        vec3 normal = ComputeNormal(Ray.pos);
+        vec3 light = ComputeLight(
+                vec3(cos(time)*8.0, -10.0, sin(time)*4.0),
+                vec3(1.0, 1.0, 1.0),
                 normal,
-                RAY_RESULT.pos,
-                RAY_RESULT.material
-                ) + Mdiffuse(RAY_RESULT.material)*0.2;
+                Ray.pos,
+                Ray.material
+                ) + Mdiffuse(Ray.material)*0.2;
 
         color = light;
 
     }
 
     color = pow(color, vec3(1.0/0.6));
+
     out_color = vec4(color, 1.0);
 }
 
 
+
+
+@startup_cmd
+
+ADD COLOR test_color;
+ADD VALUE test_value;
+
+@end
 

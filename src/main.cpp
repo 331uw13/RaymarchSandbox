@@ -1,11 +1,15 @@
 #include "rmsb.hpp"
 
-
 #include <stdio.h>
 
 
 
 void key_inputs(RMSB* rmsb) {
+    
+    if(!IsKeyDown(KEY_LEFT_CONTROL)) {
+        return;
+    }
+
     if(IsKeyPressed(KEY_TAB)) {
         rmsb->toggle_fullscreen();
     }
@@ -35,6 +39,10 @@ void loop(RMSB* rmsb) {
         rmsb->render_infolog();
         rmsb->gui.update();
         rmsb->gui.render(rmsb);
+
+        Editor& editor = Editor::get_instance();
+        editor.update();
+        editor.render();
 
        
         if(rmsb->show_fps) {
@@ -70,12 +78,19 @@ int main(int argc, char** argv) {
     rmsb.shader_filepath += shader_filepath;
     rmsb.init();
 
+    Editor& editor = Editor::get_instance();
     InternalLib& ilib = InternalLib::get_instance();
+
     ilib.create_source();
     rmsb.reload_shader();
 
+    editor.title = shader_filepath;
+
     loop(&rmsb);
     rmsb.quit();
+
+    editor.quit();
+
 
     return 0;
 }

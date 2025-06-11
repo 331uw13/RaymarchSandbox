@@ -1,12 +1,14 @@
 #ifndef RAYMARCH_SANDBOX_GUI_HPP
 #define RAYMARCH_SANDBOX_GUI_HPP
 
-#define GUI_WIDTH 400
-#define GUI_HEIGHT 430
+#define GUI_WIDTH 355
+#define GUI_HEIGHT 600
 #define FUNCTIONS_VIEW_WIDTH 750
 
 
+
 class RMSB;
+struct uniform_t;
 
 class RMSBGui {
     public:

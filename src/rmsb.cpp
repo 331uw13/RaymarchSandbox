@@ -37,6 +37,10 @@ void RMSB::init() {
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(300);
     SetExitKey(0);
+    
+    this->gui.init();
+
+    Editor::get_instance().init();
 
     m_winsize_nf = (Vector2){ DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT };
     m_fullscreen = false;
@@ -46,6 +50,7 @@ void RMSB::init() {
     for(size_t i = 0; i < INFO_ARRAY_MAX_SIZE; i++) {
         m_infolog[i].enabled = 0;
     }
+    
 
     this->show_infolog = true;
     this->reset_time_on_reload = true;
@@ -54,15 +59,15 @@ void RMSB::init() {
     this->time = 0.0;
     this->file_read_timer = 0.0f;
     this->shader_loaded = false;
-    this->gui.init();
     this->show_fps = true;
     this->fov = 30.0;
-    this->hit_distance = 0.00005;
+    this->hit_distance = 0.000015;
     this->max_ray_len = 200.0;
     printf(
-            "<TAB>  Fullscreen\n"
-            "<F>    Gui\n"
-            "<R>    Reload shader\n"
+            "Controls\n"
+            "<CTRL + TAB>  Fullscreen\n"
+            "<CTRL + F>    Gui\n"
+            "<CTRL + R>    Reload shader\n"
             );
 
     SetTraceLogCallback(tracelog_callback);
@@ -117,6 +122,25 @@ void RMSB::render_shader() {
     };
 
     BeginShaderMode(this->shader);
+
+    InternalLib& ilib = InternalLib::get_instance();
+    for(struct uniform_t u : ilib.uniforms) {
+
+        switch(u.type) {
+            case UNIFORM_TYPE_COLOR:
+                SetShaderValue(this->shader, GetShaderLocation(this->shader, u.name.c_str()),
+                        u.values, SHADER_UNIFORM_VEC4);
+                break;
+            case UNIFORM_TYPE_VALUE:
+                SetShaderValue(this->shader, GetShaderLocation(this->shader, u.name.c_str()),
+                        &u.values[0], SHADER_UNIFORM_FLOAT);
+                break;
+            case UNIFORM_TYPE_POSITION:
+                break;
+        }
+
+    }
+
     SetShaderValue(this->shader, GetShaderLocation(this->shader, "time"), &ftime, SHADER_UNIFORM_FLOAT);
     SetShaderValue(this->shader, GetShaderLocation(this->shader, "FOV"), &this->fov, SHADER_UNIFORM_FLOAT);
     SetShaderValue(this->shader, GetShaderLocation(this->shader, "HIT_DISTANCE"), &this->hit_distance, SHADER_UNIFORM_FLOAT);
@@ -124,6 +148,121 @@ void RMSB::render_shader() {
     SetShaderValueV(this->shader, GetShaderLocation(this->shader, "screen_size"), &screen_size, SHADER_UNIFORM_VEC2, 1);
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), WHITE);
     EndShaderMode();
+}
+        
+
+void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
+
+    if(code_line->size() < 4) { // Empty or just garbage.
+        return;
+    }
+
+    if(!code_line->find("ADD:")) {
+        fprintf(stderr, "'%s': \"%s\" not valid startup command.\n",
+                __func__, code_line->c_str());
+        return;
+    }
+
+    // TODO: Make this safer.
+    //
+#define COMMAND_ARGS_SIZE 16 
+    std::string part = "";
+    std::string args[COMMAND_ARGS_SIZE];
+    size_t num_args = 0;
+
+    // Read into 'parts'
+    // and when <space char> is found. move it into args[num_args].
+    for(size_t i = 0; i < code_line->size(); i++) {
+        char c = (*code_line)[i];
+
+        bool line_end = (c == ';');
+
+        if((c == 0x20) || line_end) {
+            args[num_args] = part;
+            num_args++;
+            part.clear();
+            continue;
+        }
+
+        part += c;
+    }
+
+
+    // TODO: Use hash for string and switch statement if adding alot of types.
+
+
+    std::string* type = &args[1];
+    std::string* name = &args[2];
+
+    printf("NAME:'%s'\n", name->c_str());
+
+    struct uniform_t uniform = {
+        .type = -1,
+        .location = 0,
+        .values = { 0.0, 0.5, 0.5, 1.0 },
+        .name = *name
+    };
+
+    if(*type == "COLOR") {
+        uniform.type = UNIFORM_TYPE_COLOR;
+
+    }
+    else
+    if(*type == "VALUE") {
+        uniform.type = UNIFORM_TYPE_VALUE;
+    }
+    else
+    if(*type == "POSITION") {
+        uniform.type = UNIFORM_TYPE_POSITION; 
+    }
+
+
+    InternalLib::get_instance().add_uniform(&uniform);
+
+}
+
+void RMSB::run_shader_startup_cmd(const std::string* shader_code) {
+    size_t begin_index = shader_code->find(STARTUP_CMD_BEGIN_TAG);
+    size_t end_index = shader_code->find(STARTUP_CMD_END_TAG);
+
+    if((begin_index == std::string::npos) || (end_index == std::string::npos)) {
+        printf("'%s': No valid startup command region found.\n", __func__);
+        return;
+    }
+
+    begin_index += strlen(STARTUP_CMD_BEGIN_TAG)+1;
+
+    printf("%s\n", __func__);
+
+    std::string line = "";
+
+    for(size_t i = begin_index; i < end_index; i++) {
+        char c = (*shader_code)[i];
+        if(c == '\n') {
+            printf("\"%s\"\n", line.c_str());
+            
+            proccess_shader_startup_cmd_line(&line);
+
+            line.clear();
+            continue;
+        }
+
+        line += c;
+    }
+
+
+}
+
+void RMSB::remove_startup_cmd_blocks(std::string* shader_code) {
+    size_t begin_index = shader_code->find(STARTUP_CMD_BEGIN_TAG);
+    size_t end_index = shader_code->find(STARTUP_CMD_END_TAG);
+
+    if((begin_index == std::string::npos) || (end_index == std::string::npos)) {
+        printf("'%s': No valid startup command region found.\n", __func__);
+        return;
+    }
+
+    shader_code->erase(begin_index, end_index);
 }
 
 
@@ -144,28 +283,42 @@ void RMSB::reload_shader() {
     ErrorLog::get_instance().clear();
     g_listen_shader_log = true;
 
+    // Load shader code from file.
     char* data = LoadFileText(file);
-    std::string code = InternalLib::get_instance().get_source() + data;
+
+    std::string shader_code = data;
+    UnloadFileText(data);
+
+    if(m_first_shader_load) {
+        run_shader_startup_cmd(&shader_code);
+    }
+
+    remove_startup_cmd_blocks(&shader_code);
+
+    // Get internal library code.
+    std::string code = InternalLib::get_instance().get_source() + shader_code;// + data;
     code += '\0';
 
+    // Load shader.
     this->shader = LoadShaderFromMemory(0, code.c_str());
-    //printf("%i\n", this->shader.id);
     printf("\033[90m%s\033[0m\n", code.c_str());
 
     if(this->shader.id > 0) {
         this->shader_loaded = true;
     }
 
-    UnloadFileText(data);
-
     if(this->reset_time_on_reload) {
         this->time = 0;
     }
     g_listen_shader_log = false;
 
+    // Message.
     if(IsShaderValid(this->shader)) {
         loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
         m_first_shader_load = false;
+    }
+    else {
+        loginfo(RED, "Compiling or linking failed.");
     }
 }
 
