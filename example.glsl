@@ -44,7 +44,8 @@ void main() {
 
 
 
-
+// This will add custom uniforms automatically when the shader is compiled the first time.
+// They can be then modified at run time from "Input" tab. Or add new ones from the gui.
 @startup_cmd
 
 ADD COLOR test_color;
