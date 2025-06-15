@@ -34,9 +34,9 @@ Material map(vec3 p) {
     p = RepeatINF(p, vec3(12.0));
 
     Mdistance(test) = SphereSDF(p, 2.0);
-    Mdiffuse(test) = vec3(test_color);
+    Mdiffuse(test) = vec3(test_color); // Diffuse color.
+    Mspecular(test) = vec3(0.48, 0.44, 0.42); // Specular color.
     Mshine(test) = 0.25;
-    Mspecular(test) = vec3(0.48);
 
     return test;
 }
