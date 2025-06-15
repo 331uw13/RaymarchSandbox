@@ -73,22 +73,26 @@ int main(int argc, char** argv) {
         fprintf(stderr, "File \"%s\" is empty.\n", shader_filepath);
         return 1;
     }
-
-    RMSB rmsb;
-    rmsb.shader_filepath += shader_filepath;
-    rmsb.init();
+    
 
     Editor& editor = Editor::get_instance();
     InternalLib& ilib = InternalLib::get_instance();
+
+    RMSB rmsb;
+    rmsb.shader_filepath += shader_filepath;
+    
+    rmsb.init();
+
 
     ilib.create_source();
     rmsb.reload_shader();
 
     editor.title = shader_filepath;
 
-    loop(&rmsb);
-    rmsb.quit();
 
+    loop(&rmsb);
+
+    rmsb.quit();
     editor.quit();
 
 

@@ -60,15 +60,22 @@ void RMSB::init() {
     this->file_read_timer = 0.0f;
     this->shader_loaded = false;
     this->show_fps = true;
-    this->fov = 30.0;
+    this->fov = 60.0;
     this->hit_distance = 0.000015;
-    this->max_ray_len = 200.0;
+    this->max_ray_len = 500.0;
     printf(
             "Controls\n"
             "<CTRL + TAB>  Fullscreen\n"
             "<CTRL + F>    Gui\n"
             "<CTRL + R>    Reload shader\n"
             );
+
+
+    char* data = LoadFileText(this->shader_filepath.c_str());
+    const std::string shader_code = data;
+    UnloadFileText(data);
+    printf("%s\n", shader_code.c_str());
+    Editor::get_instance().load_data(shader_code);
 
     SetTraceLogCallback(tracelog_callback);
 }
@@ -199,7 +206,7 @@ void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
     struct uniform_t uniform = {
         .type = -1,
         .location = 0,
-        .values = { 0.0, 0.5, 0.5, 1.0 },
+        .values = { 0.99, 0.56, 0.5, 1.0 },
         .name = *name
     };
 
@@ -280,14 +287,16 @@ void RMSB::reload_shader() {
         return;
     }
    
-    ErrorLog::get_instance().clear();
     g_listen_shader_log = true;
 
     // Load shader code from file.
-    char* data = LoadFileText(file);
+    //char* data = LoadFileText(file);
+    //std::string shader_code = data;
+    //UnloadFileText(data);
+    
+    
+    std::string shader_code = Editor::get_instance().get_data_str();
 
-    std::string shader_code = data;
-    UnloadFileText(data);
 
     if(m_first_shader_load) {
         run_shader_startup_cmd(&shader_code);

@@ -23,7 +23,7 @@ void InternalLib::create_source() {
     this->source += "#define PI 3.14159\n";
     this->source += "#define PI2 (PI*2.0)\n";
     this->source += "#define PI_R (PI/180.0)\n";
-
+    this->source += "#define ColorRGB(r,g,b) vec3(r/255.0, g/255.0, b/255.0)\n";
 
     // Shape must have:
     // - Diffuse,
