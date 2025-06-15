@@ -5,7 +5,7 @@
 
 
 
-> Refernces for raymarching functions: https://iquilezles.org/articles/
+> References for raymarching functions: https://iquilezles.org/articles/
 
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox.png?raw=true)
