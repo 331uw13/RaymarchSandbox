@@ -1,6 +1,6 @@
 # RaymarchSandbox
-* Built-in functions for raymarching
-* Text editor
+* Built-in functions for raymarching.
+* Text editor with GLSL syntax highlight.
 * Custom uniform inputs.
 
 
