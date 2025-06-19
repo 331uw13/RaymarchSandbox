@@ -3,7 +3,7 @@
 #include <cstring>
 
 #include "editor.hpp"
-
+#include "rmsb.hpp"
 
 #define FONT_FILEPATH "./Px437_IBM_Model3x_Alt4.ttf"
 #define FONT_SPACING 1.0
@@ -40,22 +40,24 @@ void Editor::init() {
     m_background_color = (Color){ 20, 15, 12, 255 };
     m_foreground_color = (Color){ 230, 210, 150, 255 };
     m_cursor_color = (Color){ 80, 200, 100, 255 };
+    m_comment_color = (Color){ 120, 120, 120, 255 };
 
+    this->open = true;
     this->page_size = 40;
-    this->opacity = 200;
+    this->opacity = 245;
     this->key_repeat_delay = 0.250;
     this->key_repeat_speed = 0.050;
     
     m_fontsize = 16;
     m_size = (Vector2){ 700, (float)(this->page_size * m_fontsize) };
-    m_pos = (Vector2){ GetScreenWidth()-(m_size.x+20), 40 };
+    m_pos = (Vector2){ GUI_WIDTH+20, 300 };
     m_grab_offset = (Vector2){ 0, 0 };
     m_grab_offset_set = false;
     m_margin = 3;
     m_scroll = 0;
-
     m_key_delay_timer = 0.0;
     m_key_repeat_timer = 0.0;
+    m_multiline_comment = false;
 
     this->init_syntax_colors();
     this->clear();
@@ -98,7 +100,10 @@ std::string Editor::get_data_str() {
     return str;
 }
 
-void Editor::render() {
+void Editor::render(RMSB* rmsb) {
+    if(!this->open) {
+        return;
+    }
 
     // Background.
     DrawRectangle(
@@ -116,8 +121,12 @@ void Editor::render() {
             m_size.x, m_charsize.y + PADDING, /* Size */  
             dim_color(m_background_color, 0.8)
             );
+    draw_text(title.c_str(), 1, -1, m_foreground_color);
 
-    draw_text(title.c_str(), 0, -1, m_foreground_color);
+    if(rmsb->mode == EDIT_MODE) {
+        int num_cols = m_size.x / m_charsize.x;
+        draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 0xFF });
+    }
 
     // Cursor
 
@@ -137,6 +146,7 @@ void Editor::render() {
     size_t data_visible = (m_scroll + this->page_size);
     data_visible = (data_visible > m_data.size()) ? m_data.size() : data_visible;
     int y = 0;
+    m_multiline_comment = false;
     for(size_t i = m_scroll; i < data_visible; i++) {
         const std::string* line = &m_data[i];
         draw_text_glsl_syntax(line->c_str(), line->size(), m_margin, y);
@@ -161,9 +171,12 @@ void Editor::update_charsize() {
 }
 
 void Editor::update() {
+    if(!this->open) {
+        return;
+    }
     Vector2 mouse = GetMousePosition();
 
-    bool mouse_down = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
+    bool mouse_down = IsMouseButtonDown(MOUSE_RIGHT_BUTTON);
 
     if((mouse.x > m_pos.x && mouse.x < m_pos.x + m_size.x)
     && (mouse.y > m_pos.y && mouse.y < m_pos.y + m_size.y)
@@ -184,8 +197,10 @@ void Editor::update() {
         m_grab_offset_set = false;
     }
 
-    handle_char_inputs();
-    handle_frame_key_inputs();
+    if(!IsKeyDown(KEY_LEFT_CONTROL)) {
+        handle_char_inputs();
+        handle_frame_key_inputs();
+    }
 
     m_background_color.a = this->opacity;
     m_cursor_color.a = (unsigned char)((sin(GetTime()*8)*0.5+0.5)*200.0)+50;
@@ -298,14 +313,17 @@ void Editor::handle_backspace() {
 }
 
 void Editor::handle_enter() {
+    if(cursor.x < 0) {
+        cursor.x = 0;
+    }
+    
     std::string* current = get_line(cursor.y);
     size_t current_size = current->size();
-
     m_data.insert(m_data.begin()+cursor.y+1, "");
 
     if(cursor.x < (int64_t)current_size) {
         std::string* below = get_line(cursor.y+1);
-
+        
         *below += current->substr(cursor.x);
         current->erase(cursor.x, current->size());
         cursor.x = 0;
@@ -322,7 +340,6 @@ void Editor::handle_enter() {
 
 
 void Editor::handle_char_inputs() {
-
     char c = this->char_input;
     if(c == 0) {
         return;
@@ -361,7 +378,7 @@ void Editor::clamp_cursor() {
 }
 
 
-void Editor::move_cursor_to(int x, int y) {
+void Editor::move_cursor_to(int64_t x, int64_t y) {
    
     int max_vrow = this->page_size + m_scroll;
 
@@ -383,6 +400,19 @@ void Editor::move_cursor_to(int x, int y) {
 void Editor::move_cursor(int xoff, int yoff) {
     move_cursor_to(cursor.x + xoff, cursor.y + yoff);
 }
+        
+void Editor::swap_line(int64_t y, int offset) {
+
+    std::string* current = get_line(y);
+    std::string* to = get_line(y + offset);
+    m_tmp_str = *to;
+
+    *to = *current;
+    *current = m_tmp_str;
+
+
+
+}
 
 void Editor::handle_key_input(int bypassed_check) {  
     bool(*check_key)(int) = (bypassed_check) ? IsKeyPressed : IsKeyDown;
@@ -394,9 +424,15 @@ void Editor::handle_key_input(int bypassed_check) {
         move_cursor(1, 0);
     }
     if(check_key(INPUT_KEYS[ IK_DOWN ])) {
+        if(IsKeyDown(KEY_LEFT_ALT)) {
+            swap_line(cursor.y, 1);
+        }
         move_cursor(0, 1);
     }
     if(check_key(INPUT_KEYS[ IK_UP ])) {
+        if(IsKeyDown(KEY_LEFT_ALT)) {
+            swap_line(cursor.y, -1);
+        }
         move_cursor(0, -1);
     }
     
@@ -477,27 +513,75 @@ void Editor::draw_text(const char* text, float x, float y, Color color) {
             },
             m_fontsize, FONT_SPACING, color);
 }
-        
+
+Color Editor::get_keyword_color(char* buffer) {
+    Color color = m_foreground_color;
+
+    std::map<std::string_view, int>::iterator elem = m_color_map.find(buffer);
+    if(elem != m_color_map.end()) {
+        color = GetColor(elem->second);
+    }
+    return color;
+}
+
+void Editor::drawnclear_kwbuf(char* kwbuf, size_t* kwbuf_i, int* text_x, int text_y, Color color) {
+    draw_text(kwbuf, (float)*text_x, text_y, color);
+    *text_x += *kwbuf_i;
+    memset(kwbuf, 0, *kwbuf_i);
+    *kwbuf_i = 0;
+}
+
+
 void Editor::draw_text_glsl_syntax(const char* text, size_t text_size, float x, float y) {
 
     #define KEYWORD_BUFFER_SIZE 32
 
     char kwbuf[KEYWORD_BUFFER_SIZE+1] = { 0 };
     size_t kwbuf_i = 0;
-    float text_x = x;
+    int text_x = x;
+
+    bool is_comment = false;
 
     for(size_t i = 0; i < text_size; i++) {
-        char c = text[i];
+        const char c = text[i];
         const bool line_end = (i+1 >= text_size);
-       
+
         // There are few checks for "special" character <-- (in the sense of special for keyword)
-        // That is because for example: "if(something)" or "return;" is valid
-        // but if we only detect that keyword
+        // That is because for example: "if(something)" or "return;" is valid but
+        // if we only detect that keyword
         // ends at "space", end of line or when 
         // keyword buffer would grow too big.
         // that doesnt get highlighted.
 
-        bool special = (c == '(') || (c == ';') || (c == '.');
+        const bool special = (c == '(') || (c == ';') || (c == '.');
+
+        // Check for comments.
+        if(!line_end) {
+            const char next_char = text[i+1];
+            if(c == '/' && next_char == '/') { /* Normal comment started */
+                // Draw the current data in kwbuf.
+                // If there are no spaces between "example//comment"
+                // it will show "example" in comment color.
+                drawnclear_kwbuf(kwbuf, &kwbuf_i, &text_x, (int)y, get_keyword_color(kwbuf));
+                is_comment = true;
+            }
+            else
+            if(c == '/' && next_char == '*') { /* MultiLine comment started */
+                drawnclear_kwbuf(kwbuf, &kwbuf_i, &text_x, (int)y, get_keyword_color(kwbuf));
+                m_multiline_comment = true;
+            }
+            else
+            if(c == '*' && next_char == '/') { /* MultiLine comment ended */
+                kwbuf[kwbuf_i++] = '*';
+                kwbuf[kwbuf_i++] = '/';
+                drawnclear_kwbuf(kwbuf, &kwbuf_i, &text_x, (int)y, m_comment_color);
+                m_multiline_comment = false;
+                i++;
+                continue;
+            }
+        }
+
+        const bool comment_enabled = (is_comment || m_multiline_comment);
 
         if(
            (c == 0x20)
@@ -506,7 +590,6 @@ void Editor::draw_text_glsl_syntax(const char* text, size_t text_size, float x, 
         || (kwbuf_i+1 >= KEYWORD_BUFFER_SIZE)
         
         ){
-           
             bool pre_added = false;
             if(c != 0x20 && !special) {
                 // Character is not "space":
@@ -517,13 +600,7 @@ void Editor::draw_text_glsl_syntax(const char* text, size_t text_size, float x, 
                 pre_added = true;
             }
 
-            Color color = m_foreground_color;
-
-            std::map<std::string_view, int>::iterator elem = m_color_map.find(kwbuf);
-            if(elem != m_color_map.end()) {
-                color = GetColor(elem->second);
-            }
-
+            Color color = !comment_enabled ? get_keyword_color(kwbuf) : m_comment_color;
 
             if(!pre_added && !special) {
                 // Character was space. Add it after searching for keyword color
@@ -536,13 +613,17 @@ void Editor::draw_text_glsl_syntax(const char* text, size_t text_size, float x, 
             
             if(special) {
                 const char tmp[2] = { c, '\0' };
-                draw_text(tmp, text_x, y, m_foreground_color);
+                draw_text(tmp, text_x, y, !comment_enabled ? m_foreground_color : m_comment_color);
                 text_x += 1;
             }
 
             memset(kwbuf, 0, kwbuf_i);
             kwbuf_i = 0;
             continue;
+        }
+
+        if(line_end) {
+            is_comment = false;
         }
         
         kwbuf[kwbuf_i++] = c;
@@ -571,6 +652,7 @@ void Editor::init_syntax_colors() {
     m_color_map["Camera"] = GLOBAL;
     m_color_map["Ray"] = GLOBAL;
     m_color_map["SphereSDF"] = INTERNAL;
+    m_color_map["CameraInputRotation"] = INTERNAL;
     m_color_map["Noise"] = INTERNAL;
     m_color_map["RayDir"] = INTERNAL;
     m_color_map["Raymarch"] = INTERNAL;

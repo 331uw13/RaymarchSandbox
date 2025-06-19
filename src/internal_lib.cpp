@@ -13,6 +13,7 @@ void InternalLib::create_source() {
     this->documents.clear();
     this->uniforms.clear();
 
+
     this->source += GLSL_VERSION;
     this->source += "out vec4 out_color;\n";
     this->source += "uniform vec2 screen_size;\n";
@@ -20,11 +21,13 @@ void InternalLib::create_source() {
     this->source += "uniform float FOV;\n";
     this->source += "uniform float HIT_DISTANCE;\n";
     this->source += "uniform float MAX_RAY_LENGTH;\n";
+    this->source += "uniform vec3 CAMERA_INPUT_POS;\n";
+    this->source += "uniform float CAMERA_INPUT_YAW;\n";
+    this->source += "uniform float CAMERA_INPUT_PITCH;\n";
     this->source += "#define PI 3.14159\n";
     this->source += "#define PI2 (PI*2.0)\n";
     this->source += "#define PI_R (PI/180.0)\n";
     this->source += "#define ColorRGB(r,g,b) vec3(r/255.0, g/255.0, b/255.0)\n";
-
     // Shape must have:
     // - Diffuse,
     // - Specular
@@ -60,9 +63,10 @@ void InternalLib::create_source() {
             "   vec3 dir;\n"
             "} Camera;\n"
             ,
-            "Camera position should be the view position.\n"
-            "Usually the same as ray origin.\n"
-            "Camera direction is not yet used."
+            "Needed for light calculations\n"
+            "Camera position should be the view position\n"
+            "(usually the same as ray origin).\n"
+            "Camera direction is not yet used.\n"
             );
 
     add_document(
@@ -110,6 +114,7 @@ void InternalLib::create_source() {
             "Returns a pseudo random number.\n"
             );
 
+
     add_document(
             "vec3 RayDir()\n"
             "{\n"
@@ -154,11 +159,11 @@ void InternalLib::create_source() {
     add_document(
             "vec3 ComputeNormal(vec3 p)\n"
             "{\n"
-            "   vec2 e = vec2(0.001, 0.0);\n"
+            "   vec2 e = vec2(0.01, 0.0);\n"
             "   return normalize(vec3(\n"
-            "      Mdistance(map(p - e.xyy)),\n"
-            "      Mdistance(map(p - e.yxy)),\n"
-            "      Mdistance(map(p - e.yyx))\n"
+            "      Mdistance(map(p - e.xyy)) - Mdistance(map(p + e.xyy)),\n"
+            "      Mdistance(map(p - e.yxy)) - Mdistance(map(p + e.yxy)),\n"
+            "      Mdistance(map(p - e.yyx)) - Mdistance(map(p + e.yyx))\n"
             "   ));\n"
             "}\n"
             ,
@@ -169,7 +174,7 @@ void InternalLib::create_source() {
     add_document(
             "vec3 ComputeLight(vec3 light_pos, vec3 color, vec3 normal, vec3 ray_pos, Material m)\n"
             "{\n"
-            "   vec3 light_dir = normalize(light_pos - ray_pos);\n"
+            "   vec3 light_dir = normalize(light_pos - abs(ray_pos));\n"
             "   vec3 view_dir = normalize(Camera.pos - ray_pos);\n"
             "   vec3 halfway_dir = normalize(light_dir - view_dir);\n"
             "   float nh_dot = max(dot(normal, halfway_dir), 0.0);\n"
@@ -251,6 +256,19 @@ void InternalLib::create_source() {
             "d: Color\n"
             "Example: \n"
             "'vec3 color = Palette(sin(time)*0.5+0.5, SOFT_PALETTE);'\n"
+            );
+
+    add_document(
+            "vec3 CameraInputRotation(vec3 rd)\n"
+            "{\n"
+            "   rd.yz *= RotateM2(CAMERA_INPUT_PITCH);\n"
+            "   rd.xz *= RotateM2(CAMERA_INPUT_YAW);\n"
+            "   return rd;\n"
+            "}\n"
+            ,
+            "Returns new ray direction.\n"
+            "Notes:\n"
+            " - Camera input has to be enabled from View_Mode\n"
             );
 
     add_document(

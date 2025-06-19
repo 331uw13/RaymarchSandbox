@@ -1,6 +1,6 @@
 #include "uniforms_tab.hpp"
 
-#include "../util.hpp"
+#include "../shader_util.hpp"
 #include "../rmsb.hpp"
 #include "../imgui.h"
 

@@ -9,12 +9,12 @@
 
 #include "rmsb_gui.hpp"
 #include "rmsb.hpp"
-#include "util.hpp"
+#include "shader_util.hpp"
 
 #include "gui_tabs/uniforms_tab.hpp"
 #include "gui_tabs/settings_tab.hpp"
 #include "gui_tabs/editor_tab.hpp"
-
+#include "gui_tabs/keybinds_tab.hpp"
 
 void RMSBGui::init() {
     ImGui::CreateContext();
@@ -23,7 +23,7 @@ void RMSBGui::init() {
     ImGui_ImplOpenGL3_Init("#version 130");
 
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.DisplaySize = ImVec2(DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT);
     
     //glfwSetCharCallback((GLFWwindow*)GetWindowHandle(), ImGui_ImplGlfw_CharCallback);
@@ -31,7 +31,7 @@ void RMSBGui::init() {
 
     ImVec4* colors = ImGui::GetStyle().Colors;
     colors[ImGuiCol_Text]                   = ImVec4(0.59f, 0.87f, 0.61f, 1.00f);
-    colors[ImGuiCol_WindowBg]               = ImVec4(0.10f, 0.10f, 0.10f, 0.86f);
+    colors[ImGuiCol_WindowBg]               = ImVec4(0.10f, 0.10f, 0.10f, 0.96f);
     colors[ImGuiCol_FrameBgActive]          = ImVec4(0.24f, 0.37f, 0.91f, 0.67f);
     colors[ImGuiCol_TitleBgActive]          = ImVec4(0.21f, 0.30f, 0.30f, 1.00f);
     colors[ImGuiCol_CheckMark]              = ImVec4(0.17f, 0.94f, 0.32f, 1.00f);
@@ -46,7 +46,15 @@ void RMSBGui::init() {
     colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.43f, 0.16f, 0.29f, 1.00f);
     colors[ImGuiCol_SliderGrab]             = ImVec4(0.27f, 0.44f, 0.32f, 1.00f);
 
-    this->view_functions = false;
+    colors[ImGuiCol_Text]                   = ImVec4(0.98f, 0.81f, 0.68f, 1.00f);
+    colors[ImGuiCol_Header]                 = ImVec4(0.57f, 0.28f, 0.22f, 0.31f);
+    colors[ImGuiCol_HeaderHovered]          = ImVec4(0.55f, 0.20f, 0.26f, 0.80f);
+    colors[ImGuiCol_HeaderActive]           = ImVec4(0.51f, 0.29f, 0.40f, 1.00f);
+    colors[ImGuiCol_TabHovered]             = ImVec4(0.62f, 0.46f, 0.49f, 0.80f);
+    colors[ImGuiCol_Tab]                    = ImVec4(0.28f, 0.17f, 0.20f, 0.86f);
+    colors[ImGuiCol_TabSelected]            = ImVec4(0.34f, 0.29f, 0.29f, 1.00f);
+
+    this->view_functions = true;
     this->open = true;
 }
 
@@ -57,12 +65,24 @@ void RMSBGui::quit() {
 }
 
 void RMSBGui::update() {
+    ImGuiIO& io = ImGui::GetIO();
+
+    char input_char = GetCharPressed();
+    if(input_char != 0) {
+        Editor& editor = Editor::get_instance();
+        if(editor.open) {
+            Editor::get_instance().char_input = input_char;
+        }
+    }
+
     if(!this->open) {
         return;
     }
 
-    ImGuiIO& io = ImGui::GetIO();
 
+    if(input_char != 0) {
+        io.AddInputCharacter(input_char);
+    }
     io.DisplaySize = ImVec2((float)GetScreenWidth(), (float)GetScreenHeight());
 
     Vector2 mouse = GetMousePosition();
@@ -74,11 +94,6 @@ void RMSBGui::update() {
 
     io.MouseWheel += GetMouseWheelMove();
 
-    char input_char = GetCharPressed();
-    if(input_char != 0) {
-        io.AddInputCharacter(input_char);
-        Editor::get_instance().char_input = input_char;
-    }
 
     // TODO: Add support for holding keys down.
     io.AddKeyEvent(ImGuiKey_Backspace, IsKeyPressed(KEY_BACKSPACE));
@@ -98,13 +113,12 @@ void RMSBGui::render(RMSB* rmsb) {
 
     if(this->open) {
         ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, GUI_HEIGHT));
+        ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, GetScreenHeight()));
         ImGui::Begin("Gui", NULL, 
               ImGuiWindowFlags_NoMove
             | ImGuiWindowFlags_NoTitleBar
             | ImGuiWindowFlags_NoResize);
         {
-            //ImGui::ShowDemoWindow();
 
 
             if(ImGui::BeginTabBar("##SETTINGS_TAB")) {
@@ -119,6 +133,10 @@ void RMSBGui::render(RMSB* rmsb) {
                 }
                 if(ImGui::BeginTabItem("GLSL Editor")) {
                     EditorSettingsTab::render(rmsb);
+                    ImGui::EndTabItem();
+                }
+                if(ImGui::BeginTabItem("Keybinds")) {
+                    KeybindsTab::render();
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();

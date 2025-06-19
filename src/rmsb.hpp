@@ -24,13 +24,21 @@ struct infotext_t {
     int   enabled;
 };
 
-// ----- TODO -------
-/*
+struct camera_t {
+    Vector3 pos;
+    Vector3 dir;
+    float fov;
+    float yaw;
+    float pitch;
+    float sensetivity;
+};
 
-   - Custom uniforms. Position, Color, Slider value.
+enum Mode {
+    VIEW_MODE,
+    EDIT_MODE
+};
 
 
-*/
 class RMSB {
     public:
         Shader shader;
@@ -44,7 +52,9 @@ class RMSB {
         bool time_paused;
         bool reset_time_on_reload;
         bool show_infolog;
-            
+        bool allow_camera_input;
+        int fps_limit;
+
         float file_read_timer;
     
         float fov;
@@ -52,23 +62,26 @@ class RMSB {
         float max_ray_len;
 
         RMSBGui gui;
+        struct camera_t camera;
 
         void init();
         void quit();
         void update();
 
-        void toggle_fullscreen();
         void render_shader();
         void reload_shader();
 
         void loginfo(Color color, const char* text, ...);
         void render_infolog();
 
+        enum Mode mode;
+
+        int input_key; // See 'src/input.cpp'
+
     private:
         bool m_first_shader_load;
-        bool m_fullscreen;
-        Vector2 m_winsize_nf; // Window size when its not in fullscreen.
-        
+        Vector2 m_screen_size_prev; // Changed by 'set_fullscreen()' function.
+        Vector2 m_mouse_pos;
         struct infotext_t m_infolog[INFO_ARRAY_MAX_SIZE];
         size_t m_infolog_size;
 
@@ -76,12 +89,12 @@ class RMSB {
         // @startup_command .... @end  region.
         void run_shader_startup_cmd(const std::string* shader_code);
         void proccess_shader_startup_cmd_line(const std::string* code_line);
-
+    
         // @startup_command  and @end are not valid glsl code.
         // they must be removed after reading.
         void remove_startup_cmd_blocks(std::string* shader_code);
 
-
+        void update_camera();
 };
 
 

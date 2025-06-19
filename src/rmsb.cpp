@@ -1,9 +1,13 @@
 #include <raylib.h>
+#include <raymath.h>
+#include <rcamera.h>
+
 #include <stdio.h>
 #include <GLFW/glfw3.h>
 
 #include "imgui.h"
 #include "rmsb.hpp"
+#include "shader_util.hpp"
 
 
 
@@ -34,24 +38,23 @@ void RMSB::init() {
         "Raymarch Sandbox"
     );
     SetWindowMinSize(200, 200);
-    SetWindowState(FLAG_WINDOW_RESIZABLE);
-    SetTargetFPS(300);
+    SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
     SetExitKey(0);
     
     this->gui.init();
 
     Editor::get_instance().init();
 
-    m_winsize_nf = (Vector2){ DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT };
-    m_fullscreen = false;
     m_infolog_size = 0;
     m_first_shader_load = true;
 
     for(size_t i = 0; i < INFO_ARRAY_MAX_SIZE; i++) {
         m_infolog[i].enabled = 0;
     }
-    
 
+    this->input_key = 0;
+    this->mode = EDIT_MODE;
+    this->fps_limit = 300;
     this->show_infolog = true;
     this->reset_time_on_reload = true;
     this->time_paused = false;
@@ -61,26 +64,30 @@ void RMSB::init() {
     this->shader_loaded = false;
     this->show_fps = true;
     this->fov = 60.0;
-    this->hit_distance = 0.000015;
+    this->hit_distance = 0.000150;
     this->max_ray_len = 500.0;
-    printf(
-            "Controls\n"
-            "<CTRL + TAB>  Fullscreen\n"
-            "<CTRL + F>    Gui\n"
-            "<CTRL + R>    Reload shader\n"
-            );
-
+    this->allow_camera_input = false; 
+    this->camera = (struct camera_t) {
+        .pos = (Vector3){ 0, 0, 0 },
+        .dir = (Vector3){ 0, 0, 0 },
+        .fov = this->fov,
+        .yaw = 0,
+        .pitch = 0,
+        .sensetivity = 0.1
+    };
 
     char* data = LoadFileText(this->shader_filepath.c_str());
     const std::string shader_code = data;
     UnloadFileText(data);
-    printf("%s\n", shader_code.c_str());
     Editor::get_instance().load_data(shader_code);
 
+    SetTargetFPS(this->fps_limit);
     SetTraceLogCallback(tracelog_callback);
+
+    
+    ToggleBorderlessWindowed();
 }
-
-
+        
 void RMSB::quit() {
     printf("%s\n", __func__);
  
@@ -89,6 +96,7 @@ void RMSB::quit() {
 
 }
 
+/*
 void RMSB::toggle_fullscreen() {
     ToggleBorderlessWindowed();
     
@@ -109,11 +117,66 @@ void RMSB::toggle_fullscreen() {
 
     m_winsize_nf = (Vector2){ (float)GetScreenWidth(), (float)GetScreenHeight() };
     SetWindowSize(win_width, win_height);
+}*/
+
+void RMSB::update_camera() {
+    
+
+    const float dt = GetFrameTime();
+    Vector2 md = GetMouseDelta();
+
+
+    this->camera.yaw -= (md.x * this->camera.sensetivity) * (M_PI/180.0);
+    this->camera.pitch += (md.y * this->camera.sensetivity) * (M_PI/180.0);
+
+    Vector3 cam_dir = (Vector3) {
+        (float)cos(this->camera.yaw+(M_PI/2)) * cos(-this->camera.pitch),
+        sin(-this->camera.pitch),
+        (float)sin(this->camera.yaw+(M_PI/2)) * cos(-this->camera.pitch)
+    };
+
+    const float speed = dt * 10.0;
+
+    if(IsKeyDown(KEY_W)) {
+        this->camera.pos.x += cam_dir.x * speed;
+        this->camera.pos.y += cam_dir.y * speed;
+        this->camera.pos.z += cam_dir.z * speed;
+    }
+    else
+    if(IsKeyDown(KEY_S)) {
+        this->camera.pos.x -= cam_dir.x * speed;
+        this->camera.pos.y -= cam_dir.y * speed;
+        this->camera.pos.z -= cam_dir.z * speed;
+    }
+
+
+    Vector3 right = Vector3CrossProduct(cam_dir, (Vector3){ 0, 1, 0 });
+
+    if(IsKeyDown(KEY_A)) {
+        this->camera.pos.x += right.x * speed;
+        this->camera.pos.z += right.z * speed;
+    }
+    else
+    if(IsKeyDown(KEY_D)) {
+        this->camera.pos.x -= right.x * speed;
+        this->camera.pos.z -= right.z * speed;
+    }
+
+    if(IsKeyDown(KEY_SPACE)) {
+        this->camera.pos.y += speed;
+    }
+    if(IsKeyDown(KEY_LEFT_SHIFT)) {
+        this->camera.pos.y -= speed;
+    }
 }
 
 void RMSB::update() {
     if(!this->time_paused) {
         this->time += GetFrameTime() * this->time_mult;
+    }
+
+    if(this->allow_camera_input) {
+        update_camera();
     }
 }
 
@@ -143,16 +206,21 @@ void RMSB::render_shader() {
                         &u.values[0], SHADER_UNIFORM_FLOAT);
                 break;
             case UNIFORM_TYPE_POSITION:
+                // ... TODO
                 break;
         }
-
     }
 
-    SetShaderValue(this->shader, GetShaderLocation(this->shader, "time"), &ftime, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(this->shader, GetShaderLocation(this->shader, "FOV"), &this->fov, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(this->shader, GetShaderLocation(this->shader, "HIT_DISTANCE"), &this->hit_distance, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(this->shader, GetShaderLocation(this->shader, "MAX_RAY_LENGTH"), &this->max_ray_len, SHADER_UNIFORM_FLOAT);
-    SetShaderValueV(this->shader, GetShaderLocation(this->shader, "screen_size"), &screen_size, SHADER_UNIFORM_VEC2, 1);
+
+    shader_uniform_float(&this->shader, "time", &ftime);
+    shader_uniform_float(&this->shader, "FOV", &this->fov);
+    shader_uniform_float(&this->shader, "HIT_DISTANCE", &this->hit_distance);
+    shader_uniform_float(&this->shader, "MAX_RAY_LENGTH", &this->max_ray_len);
+    shader_uniform_vec2(&this->shader, "screen_size", &screen_size);
+    shader_uniform_vec3(&this->shader, "CAMERA_INPUT_POS", &this->camera.pos);
+    shader_uniform_float(&this->shader, "CAMERA_INPUT_YAW", &this->camera.yaw);
+    shader_uniform_float(&this->shader, "CAMERA_INPUT_PITCH", &this->camera.pitch);
+
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), WHITE);
     EndShaderMode();
 }
@@ -160,7 +228,7 @@ void RMSB::render_shader() {
 
 void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
 
-    if(code_line->size() < 4) { // Empty or just garbage.
+    if(code_line->empty()) {
         return;
     }
 
@@ -197,7 +265,6 @@ void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
 
     // TODO: Use hash for string and switch statement if adding alot of types.
 
-
     std::string* type = &args[1];
     std::string* name = &args[2];
 
@@ -212,7 +279,6 @@ void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
 
     if(*type == "COLOR") {
         uniform.type = UNIFORM_TYPE_COLOR;
-
     }
     else
     if(*type == "VALUE") {
@@ -280,6 +346,8 @@ void RMSB::reload_shader() {
         this->shader.id = 0;
     }
 
+    
+    shader_util_reset_locations();
     const char* file = this->shader_filepath.c_str();
     if(!FileExists(file)) {
         fprintf(stderr, "'%s': \"%s\" does not exists\n",
@@ -287,16 +355,9 @@ void RMSB::reload_shader() {
         return;
     }
    
-    g_listen_shader_log = true;
-
-    // Load shader code from file.
-    //char* data = LoadFileText(file);
-    //std::string shader_code = data;
-    //UnloadFileText(data);
-    
-    
+    ErrorLog::get_instance().clear();
     std::string shader_code = Editor::get_instance().get_data_str();
-
+    
 
     if(m_first_shader_load) {
         run_shader_startup_cmd(&shader_code);
@@ -309,8 +370,10 @@ void RMSB::reload_shader() {
     code += '\0';
 
     // Load shader.
+    g_listen_shader_log = true;
     this->shader = LoadShaderFromMemory(0, code.c_str());
-    printf("\033[90m%s\033[0m\n", code.c_str());
+    
+    g_listen_shader_log = false;
 
     if(this->shader.id > 0) {
         this->shader_loaded = true;
@@ -319,16 +382,16 @@ void RMSB::reload_shader() {
     if(this->reset_time_on_reload) {
         this->time = 0;
     }
-    g_listen_shader_log = false;
 
     // Message.
     if(IsShaderValid(this->shader)) {
         loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
-        m_first_shader_load = false;
     }
     else {
         loginfo(RED, "Compiling or linking failed.");
     }
+    
+    m_first_shader_load = false;
 }
 
 void RMSB::loginfo(Color color, const char* text, ...) {
@@ -370,8 +433,8 @@ void RMSB::render_infolog() {
     if(!this->show_infolog) { 
         return;
     }
-    int X = 10;
-    int Y = (this->gui.open ? GUI_HEIGHT : 0) + 10;
+    int X = (this->gui.open ? GUI_WIDTH : 0) + 10;
+    int Y = 10;
 
 
     struct infotext_t* info = NULL;
@@ -382,11 +445,14 @@ void RMSB::render_infolog() {
         }
 
         info->color.a = info->timer * 255;
+        float box_width = MeasureText(info->data.c_str(), 20) + 10;
+        DrawRectangle(X-5, Y-2, box_width, 22, (Color){ 0, 0, 0, (unsigned char)info->color.a*0.5 });
+        DrawText(info->data.c_str(), X+2, Y+2, 20, (Color){ 0, 0, 0, info->color.a });
         DrawText(info->data.c_str(), X, Y, 20, info->color);
 
         Y += 25;
 
-        info->timer -= GetFrameTime() * 0.5;
+        info->timer -= GetFrameTime() * 0.275;
         if(info->timer < 0.0) {
             info->enabled = 0;
         }
