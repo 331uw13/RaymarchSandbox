@@ -73,6 +73,11 @@ void SettingsTab::render(RMSB* rmsb) {
         if(ImGui::Button("Reset position")) {
             rmsb->camera.pos = (Vector3){ 0, 0, 0 };
         }
+        
+        if(ImGui::Button("Reset direction")) {
+            rmsb->camera.yaw = 0;
+            rmsb->camera.pitch = 0;
+        }
 
         ImGui::Separator();
     }

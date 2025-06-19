@@ -27,7 +27,6 @@ struct infotext_t {
 struct camera_t {
     Vector3 pos;
     Vector3 dir;
-    float fov;
     float yaw;
     float pitch;
     float sensetivity;

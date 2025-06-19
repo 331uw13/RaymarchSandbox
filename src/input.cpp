@@ -95,7 +95,7 @@ void InputHandler::handle_edit_mode(RMSB* rmsb) {
 
         std::string editor_data = Editor::get_instance().get_data_str();
         SaveFileText(rmsb->shader_filepath.c_str(), (char*)editor_data.c_str());
-
+        rmsb->loginfo(GREEN, "Shader Saved.");
     }
 }
 

@@ -41,6 +41,7 @@ void Editor::init() {
     m_foreground_color = (Color){ 230, 210, 150, 255 };
     m_cursor_color = (Color){ 80, 200, 100, 255 };
     m_comment_color = (Color){ 120, 120, 120, 255 };
+    m_selected_color = (Color){ 25, 55, 30, 255 };
 
     this->open = true;
     this->page_size = 40;
@@ -58,6 +59,7 @@ void Editor::init() {
     m_key_delay_timer = 0.0;
     m_key_repeat_timer = 0.0;
     m_multiline_comment = false;
+    m_select.active = false;
 
     this->init_syntax_colors();
     this->clear();
@@ -99,6 +101,15 @@ std::string Editor::get_data_str() {
 
     return str;
 }
+        
+        
+Color Editor::get_selectbg_color(int y) {
+
+    y = (y*30 + (int)sin(y)*5) % 360 + GetTime()*80;
+
+    //float hue = (int)(GetTime()*10.0) % 360;
+    return ColorFromHSV((float)y, 0.5, 0.5);
+}
 
 void Editor::render(RMSB* rmsb) {
     if(!this->open) {
@@ -123,37 +134,103 @@ void Editor::render(RMSB* rmsb) {
             );
     draw_text(title.c_str(), 1, -1, m_foreground_color);
 
-    if(rmsb->mode == EDIT_MODE) {
-        int num_cols = m_size.x / m_charsize.x;
-        draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 0xFF });
+    // Extra info for title bar.
+    {
+        if(rmsb->mode == EDIT_MODE) {
+            int num_cols = m_size.x / m_charsize.x;
+            draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 0xFF });
+        }
+
+        if(this->m_select.active) {
+            draw_text("(Select)", title.size()+2, -1, (Color){ 0x30, 0xB4, 0xD9, 0xFF });
+        }
+
+    }
+
+
+    
+    size_t data_visible = (m_scroll + this->page_size);
+    data_visible = (data_visible > m_data.size()) ? m_data.size() : data_visible;
+
+
+    // Draw Selected region.
+    if(m_select.active) {
+
+
+        struct selectreg_t reg;
+        get_selected(&reg);
+
+        if(reg.start_y == reg.end_y) { /* One line selection. */
+            int width = reg.end_x - reg.start_x;
+            int rect_y = reg.start_y - m_scroll;
+            draw_rect(reg.start_x + m_margin, rect_y, width,
+                    1, get_selectbg_color(rect_y));
+        }
+        else { /* MultiLine selection */
+            
+
+            // Start Row.
+            int start_x_to_end = get_line(m_select.start_y)->size() - m_select.start_x;
+            int start_row_y = m_select.start_y - m_scroll;
+            draw_rect(
+                    m_margin + (m_select.start_x * !reg.inverted_y),
+                    start_row_y,
+                    reg.inverted_y ? m_select.start_x : start_x_to_end,
+                    1,
+                    get_selectbg_color(start_row_y)
+                    );
+
+            // End Row.
+            int end_row_y = m_select.end_y - m_scroll;
+            draw_rect(
+                    m_margin,
+                    end_row_y,
+                    m_select.end_x,
+                    1,
+                    get_selectbg_color(end_row_y)
+                    );
+
+
+            // Rows in between. 
+            for(uint64_t y = reg.start_y+1; y < reg.end_y; y++) {
+                size_t line_size = get_line(y)->size();
+                draw_rect(m_margin, y - m_scroll, (line_size != 0) ? line_size : 1, 
+                        1, get_selectbg_color(y - m_scroll));
+            }
+        }
     }
 
     // Cursor
 
-    draw_rect(cursor.x + m_margin, cursor.y - m_scroll, 1, 1, m_cursor_color);
-
-    /*
-    DrawRectangle(
-            m_pos.x + (m_margin + cursor.x) * m_charsize.x,
-            m_pos.y + cursor.y * m_charsize.y + (m_charsize.y/1.5),
-            m_charsize.x,
-            m_charsize.y / 4,
+    DrawRectangleRounded(
+            (Rectangle) {
+                m_pos.x + (cursor.x + m_margin) * m_charsize.x,
+                m_pos.y + (cursor.y - m_scroll) * m_charsize.y,
+                m_charsize.x,
+                m_charsize.y
+            },
+            0.6,
+            4,
             m_cursor_color
-           );
-    */
+            );
 
-    // Data
-    size_t data_visible = (m_scroll + this->page_size);
-    data_visible = (data_visible > m_data.size()) ? m_data.size() : data_visible;
-    int y = 0;
+    // Draw Data
+    int text_y = 0;
     m_multiline_comment = false;
     for(size_t i = m_scroll; i < data_visible; i++) {
         const std::string* line = &m_data[i];
-        draw_text_glsl_syntax(line->c_str(), line->size(), m_margin, y);
-        //draw_text(m_data[i].c_str(), m_margin, y, m_foreground_color);
-        y++;
+
+        draw_text_glsl_syntax(line->c_str(), line->size(), m_margin, text_y);
+        text_y++;
     }
 
+
+    char tmp[2] = {
+        (*get_line(cursor.y))[cursor.x],
+        '\0'
+    };
+    draw_text(tmp, cursor.x + m_margin, cursor.y,
+            (Color){ 20, (unsigned char)(200 - m_cursor_color.a/2), 20, 255 });
 
 }
         
@@ -170,17 +247,71 @@ void Editor::update_charsize() {
     m_charsize.y = m_fontsize;
 }
 
+void Editor::handle_select_with_mouse() {
+    if(m_cursor_moved && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        if(!m_select.active) {
+            m_select.active = true;
+            m_select.start_x = cursor.x;
+            m_select.start_y = cursor.y;
+        }
+    }
+    if(m_select.active) {
+        m_select.end_x = cursor.x;
+        m_select.end_y = cursor.y;
+    }
+    if(m_select.active && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        m_select.active = false;
+    }
+}
+
+void Editor::handle_select_with_keys() {
+    if(!m_select.active) {
+        m_select.active = true;
+        m_select.start_x = cursor.x;
+        m_select.start_y = cursor.y;
+    }
+
+    m_select.end_x = cursor.x;
+    m_select.end_y = cursor.y;
+
+}
+
+void Editor::get_selected(struct selectreg_t* reg) {
+    *reg = m_select;
+
+    // Start and end has to be flipped if start index doesnt make sense.
+
+    reg->inverted_x = false;
+    reg->inverted_y = false;
+
+    if((reg->start_y == reg->end_y) && (reg->start_x > reg->end_x)) {
+        int tmp_x = reg->start_x;
+        reg->start_x = reg->end_x;
+        reg->end_x = tmp_x;
+        reg->inverted_x = true;
+    }
+
+    if(reg->end_y < reg->start_y) {
+        int tmp_y = reg->start_y;
+        reg->start_y = reg->end_y;
+        reg->end_y = tmp_y;
+        reg->inverted_y = true;
+    }
+
+}
+
+
 void Editor::update() {
     if(!this->open) {
         return;
     }
     Vector2 mouse = GetMousePosition();
 
-    bool mouse_down = IsMouseButtonDown(MOUSE_RIGHT_BUTTON);
+    bool mouse_on_editor = 
+       (mouse.x > m_pos.x && mouse.x < m_pos.x + m_size.x)
+    && (mouse.y > m_pos.y && mouse.y < m_pos.y + m_size.y);
 
-    if((mouse.x > m_pos.x && mouse.x < m_pos.x + m_size.x)
-    && (mouse.y > m_pos.y && mouse.y < m_pos.y + m_size.y)
-    && mouse_down) {
+    if(mouse_on_editor && IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
         if(!m_grab_offset_set) {
             m_grab_offset_set = true;
             m_grab_offset.x = m_pos.x - mouse.x;
@@ -189,11 +320,25 @@ void Editor::update() {
 
         m_pos.x = mouse.x + m_grab_offset.x;
         m_pos.y = mouse.y + m_grab_offset.y;
-
-
+    }
+    else
+    if(mouse_on_editor && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        cursor.x = (mouse.x - m_pos.x - (m_margin * m_charsize.x)) / m_charsize.x;
+        cursor.y = (mouse.y - m_pos.y + (m_scroll * m_charsize.y)) / m_charsize.y; 
     }
 
-    if(!mouse_down) {
+
+    float mouse_wheel = GetMouseWheelMove();
+    if(mouse_wheel > 0) {
+        move_cursor(0, -1);
+    }
+    else 
+    if(mouse_wheel < 0) {
+        move_cursor(0, 1);
+    }
+
+
+    if(!IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
         m_grab_offset_set = false;
     }
 
@@ -203,18 +348,26 @@ void Editor::update() {
     }
 
     m_background_color.a = this->opacity;
-    m_cursor_color.a = (unsigned char)((sin(GetTime()*8)*0.5+0.5)*200.0)+50;
 
+    // Blinking.
+    m_cursor_color.a = (unsigned char)(pow((sin(GetTime()*8)*0.5+0.5), 3.5)*200.0)+50;
+    
     clamp_cursor();
+    m_cursor_moved = (m_prev_cursor.x != cursor.x) || (m_prev_cursor.y != cursor.y);
+
+
+    handle_select_with_mouse();
+
+    m_prev_cursor = cursor;
+
+    if(IsKeyPressed(KEY_ESCAPE)) {
+        m_select.active = false;
+    }
 }
 
 
 
 // Private functions:
-    
-void render_syntax_highlight() {
-}
-
 
 std::string* Editor::get_line(int64_t y) {
     const size_t data_size = m_data.size();
@@ -319,7 +472,7 @@ void Editor::handle_enter() {
     
     std::string* current = get_line(cursor.y);
     size_t current_size = current->size();
-    m_data.insert(m_data.begin()+cursor.y+1, "");
+    m_data.insert(m_data.begin()+cursor.y+1, ""); // Add new line.
 
     if(cursor.x < (int64_t)current_size) {
         std::string* below = get_line(cursor.y+1);
@@ -329,6 +482,8 @@ void Editor::handle_enter() {
         cursor.x = 0;
     }
 
+    // Add tabs to the just added new line 
+    // so it starts at the same column automatically.
     int num_btabs = count_begin_tabs(current);
     if(num_btabs > 0) {
         add_tabs(0, cursor.y+1, num_btabs);
@@ -409,9 +564,6 @@ void Editor::swap_line(int64_t y, int offset) {
 
     *to = *current;
     *current = m_tmp_str;
-
-
-
 }
 
 void Editor::handle_key_input(int bypassed_check) {  
@@ -419,19 +571,33 @@ void Editor::handle_key_input(int bypassed_check) {
 
     if(check_key(INPUT_KEYS[ IK_LEFT ])) {
         move_cursor(-1, 0);
+        if(IsKeyDown(KEY_LEFT_SHIFT)) {
+            handle_select_with_keys();
+        }
     }
     if(check_key(INPUT_KEYS[ IK_RIGHT ])) {
         move_cursor(1, 0);
+        if(IsKeyDown(KEY_LEFT_SHIFT)) {
+            handle_select_with_keys();
+        }
     }
     if(check_key(INPUT_KEYS[ IK_DOWN ])) {
         if(IsKeyDown(KEY_LEFT_ALT)) {
             swap_line(cursor.y, 1);
+        }
+        else
+        if(IsKeyDown(KEY_LEFT_SHIFT)) {
+            handle_select_with_keys();
         }
         move_cursor(0, 1);
     }
     if(check_key(INPUT_KEYS[ IK_UP ])) {
         if(IsKeyDown(KEY_LEFT_ALT)) {
             swap_line(cursor.y, -1);
+        }
+        else
+        if(IsKeyDown(KEY_LEFT_SHIFT)) {
+            handle_select_with_keys();
         }
         move_cursor(0, -1);
     }

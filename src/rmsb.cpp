@@ -70,7 +70,6 @@ void RMSB::init() {
     this->camera = (struct camera_t) {
         .pos = (Vector3){ 0, 0, 0 },
         .dir = (Vector3){ 0, 0, 0 },
-        .fov = this->fov,
         .yaw = 0,
         .pitch = 0,
         .sensetivity = 0.1
@@ -446,7 +445,7 @@ void RMSB::render_infolog() {
 
         info->color.a = info->timer * 255;
         float box_width = MeasureText(info->data.c_str(), 20) + 10;
-        DrawRectangle(X-5, Y-2, box_width, 22, (Color){ 0, 0, 0, (unsigned char)info->color.a*0.5 });
+        DrawRectangle(X-5, Y-2, box_width, 22, (Color){ 0, 0, 0, (unsigned char)(info->color.a*0.5) });
         DrawText(info->data.c_str(), X+2, Y+2, 20, (Color){ 0, 0, 0, info->color.a });
         DrawText(info->data.c_str(), X, Y, 20, info->color);
 

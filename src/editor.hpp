@@ -13,7 +13,7 @@
     TODO LIST.
 
     * Callbacks for rendering so all kind of graphics libraries can use this.
-    * Cross platform file IO.
+    * Cross platform file IO (without raylib).
 
 */
 
@@ -53,8 +53,20 @@ class Editor {
 
     private:
 
+        struct selectreg_t {
+            uint64_t start_x;
+            uint64_t start_y;
+            uint64_t end_x;
+            uint64_t end_y;
+            bool inverted_x;
+            bool inverted_y;
+            bool active;
+        } m_select;
+
+        
         std::map<std::string_view, int> m_color_map;
         Color get_keyword_color(char* buffer);
+        Color get_selectbg_color(int y);
 
         std::string* get_line(int64_t y);
         void add_char(char c, int64_t x, int64_t y);
@@ -75,6 +87,10 @@ class Editor {
         void handle_frame_key_inputs();
         void handle_backspace();
         void handle_enter();
+        void handle_select_with_mouse();
+        void handle_select_with_keys();
+
+        void get_selected(struct selectreg_t* reg);
 
         std::vector<std::string> m_data;
 
@@ -82,6 +98,8 @@ class Editor {
             int64_t x;
             int64_t y;
         } cursor;
+
+        struct cursor_t m_prev_cursor;
 
         Editor() {}
 
@@ -92,7 +110,7 @@ class Editor {
         Vector2 m_size;
         Vector2 m_grab_offset;
         int     m_margin;
-
+        bool m_cursor_moved;
         bool m_grab_offset_set;
 
         // Colors.
@@ -100,6 +118,7 @@ class Editor {
         Color m_background_color;
         Color m_foreground_color;
         Color m_comment_color;
+        Color m_selected_color;
 
         void update_charsize();
 
