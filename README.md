@@ -2,7 +2,7 @@
 * Built-in functions for raymarching.
 * Text editor with GLSL syntax highlight.
 * Custom uniform inputs.
-
+* First person camera support.
 
 
 > References for raymarching functions: https://iquilezles.org/articles/
