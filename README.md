@@ -1,14 +1,16 @@
 # RaymarchSandbox
+
+### Features
 * Built-in functions for raymarching.
 * Text editor with GLSL syntax highlight.
-* Custom uniform inputs.
+* Custom uniform inputs.  (texture input not implemented yet.)
 * First person camera support.
+-----------------------------------
+
+ References for raymarching from iq: https://iquilezles.org/articles/
 
 
-> References for raymarching functions: https://iquilezles.org/articles/
-
-
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-2.png?raw=true)
 
 work in progress :)
 
