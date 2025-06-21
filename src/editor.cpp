@@ -343,7 +343,8 @@ void Editor::update(RMSB* rmsb) {
     && (m_idle_timer >= rmsb->auto_reload_delay)) {
         m_idle_timer = 0;
         if(content_changed) {
-            printf("RELOAD?\n");
+            //printf("RELOAD?\n");
+            rmsb->reload_shader(USER_FALLBACK_OPTION);
             reset_diff();
         }
     }

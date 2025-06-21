@@ -378,58 +378,12 @@ void RMSB::reload_shader(ReloadOption option) {
         }
     }
 
-
-    //this->shader = LoadShaderFromMemory(0, code.c_str());
-
-    // 0 value for vertex shader will use raylib's default vertex shader.
-    //Shader tmp_shader = LoadShaderFromMemory(0, code.c_str());
-    /*
-    if(IsShaderValid(this->shader)) {
-        UnloadShader(this->shader);
-    }
-    */
-
-    /*
-    if(this->shader.id > 0) {
-        unload_shader(&this->shader);
-    }
-
-    // Compile and link shader.
-    this->shader = load_shader_from_mem(VERTEX_SHADER_CODE, code.c_str());
-    this->shader_loaded = (this->shader.id > 0);
-    */
-
-
-    /*
-    if(option == NO_FALLBACK) {
-        if(IsShaderValid(this->shader)) {
-            UnloadShader(this->shader);
-        }
-        this->shader = tmp_shader;
-        this->shader_loaded = (this->shader.id > 0);
-    }
-    else
-    if(option == FALLBACK_TO_CURRENT) {
-        bool tmp_shader_valid = IsShaderValid(tmp_shader);
-        if(tmp_shader_valid) {
-            UnloadShader(this->shader);
-            this->shader = tmp_shader;
-        }
-        else {
-            loginfo(PURPLE, "Unloaded temporary shader");
-            UnloadShader(tmp_shader);
-        }
-    }
-    */
-
     // Tell user what happened.
-    if(option == NO_FALLBACK) {
-        if(IsShaderValid(this->shader)) {
-            loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
-        }
-        else {
-            loginfo(RED, "Shader failed to compile.");
-        }
+    if(IsShaderValid(this->shader)) {
+        loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
+    }
+    else {
+        loginfo(RED, "Shader failed to compile.");
     }
     
     if(this->reset_time_on_reload) {
