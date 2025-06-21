@@ -83,3 +83,19 @@ ADD VALUE test_value;
 
 ```
 
+
+## Updates
+
+* Sat Jun 21 2025
+```
+- Updated GLSL editor to remove selected text and keep preferred column for cursor.
+- Other small updates and bug fixes for the editor.
+- Added auto reload option and delay for it.
+```
+
+
+
+
+
+
+
