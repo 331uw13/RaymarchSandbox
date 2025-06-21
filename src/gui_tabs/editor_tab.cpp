@@ -20,7 +20,8 @@ void EditorSettingsTab::render(RMSB* rmsb) {
     ImGui::Separator();
 
     ImGui::SliderInt("##EDITOR_OPACITY", &editor.opacity, 0, 255, "Opacity: %i");
-
+    ImGui::SliderFloat("##EDITOR_DIFF_CHECK_DELAY",
+            &editor.diff_check_delay, 1.0, 10.0, "Difference Check Delay: %0.1f");
 }
 
 

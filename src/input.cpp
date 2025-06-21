@@ -52,7 +52,7 @@ void InputHandler::handle_all_mode(RMSB* rmsb) {
             break;
 
         case KEY_R:
-            rmsb->reload_shader();
+            rmsb->reload_shader(USER_FALLBACK_OPTION);
             break;
 
 
@@ -92,10 +92,8 @@ void InputHandler::handle_edit_mode(RMSB* rmsb) {
     }
 
     if(IsKeyPressed(KEY_S)) {
-
-        std::string editor_data = Editor::get_instance().get_data_str();
-        SaveFileText(rmsb->shader_filepath.c_str(), (char*)editor_data.c_str());
-        rmsb->loginfo(GREEN, "Shader Saved.");
+        Editor::get_instance().save(rmsb->shader_filepath);
+        rmsb->loginfo(GREEN, TextFormat("Shader Saved (%s)", rmsb->shader_filepath.c_str()));
     }
 }
 

@@ -17,6 +17,9 @@ enum ShaderUniformI {
 };
 
 
+Shader load_shader_from_mem(const char* vs_code, const char* fs_code);
+void   unload_shader(Shader* shader);
+
 bool is_uniform_name_valid(const char* name, size_t name_size);
 
 void shader_util_reset_locations();

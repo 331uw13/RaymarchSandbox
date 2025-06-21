@@ -5,22 +5,40 @@
 #include "../rmsb.hpp"
 #include "../imgui.h"
 
-   
 
 void SettingsTab::render(RMSB* rmsb) {
-    ImGui::Text("File:'%s'", rmsb->shader_filepath.c_str());
+
+    if(ImGui::SmallButton(" Quit ")) {
+        rmsb->running = false;
+    }
+    ImGui::SameLine();
+    ImGui::Text("File: %s", rmsb->shader_filepath.c_str());
+
+    ImGui::Separator();
+
     if(ImGui::Button("Reload")) {
-        rmsb->reload_shader();
+        rmsb->reload_shader(USER_FALLBACK_OPTION);
     }
 
-    ImGui::Checkbox("View functions", &rmsb->gui.view_functions);
+    ImGui::SameLine();
+    ImGui::Checkbox("Fallback to working shader", &rmsb->fallback_user_shader);
+
+    ImGui::Checkbox("Auto Reload", &rmsb->auto_reload);
+    if(rmsb->auto_reload) {
+        ImGui::SliderFloat("##AUTO_RELOAD_TIME",
+                &rmsb->auto_reload_delay, 0.2, 10.0,
+                "Auto Reload Time: %0.1f");
+    }
+
+    ImGui::Checkbox("View Functions", &rmsb->gui.view_functions);
     ImGui::Checkbox("Show FPS", &rmsb->show_fps);
     ImGui::Checkbox("Show Infolog", &rmsb->show_infolog);
     ImGui::Checkbox("Show Editor", &Editor::get_instance().open);
-    
+
+
     //ImGui::SeparatorText("Render settings");
 
-    if(ImGui::CollapsingHeader("Render Settings")) {
+    if(ImGui::CollapsingHeader("Render Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 
         ImGui::SliderFloat("##FIELD_OF_VIEW", 
                 &rmsb->fov, 10.0, 120.0,
@@ -43,7 +61,7 @@ void SettingsTab::render(RMSB* rmsb) {
         ImGui::Separator();
     }
 
-    if(ImGui::CollapsingHeader("Time Settings")) {
+    if(ImGui::CollapsingHeader("Time Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         
         if(ImGui::Button("Reset Time")) {
             rmsb->time = 0.0;
@@ -65,11 +83,15 @@ void SettingsTab::render(RMSB* rmsb) {
         ImGui::Separator();
     }
 
-    if(ImGui::CollapsingHeader("Camera Settings")) {
+    if(ImGui::CollapsingHeader("Camera Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::SliderFloat("##CAMERA_SENSETIVITY",
                 &rmsb->camera.sensetivity, 0.001, 1.0,
                 "Sensetivity: %0.3f");
-        
+       
+        ImGui::SliderFloat("##CAMERA_MOVEMENT_SPEED",
+                &rmsb->camera.move_speed, 1.0, 60.0,
+                "Movement Speed: %0.01f");
+
         if(ImGui::Button("Reset position")) {
             rmsb->camera.pos = (Vector3){ 0, 0, 0 };
         }

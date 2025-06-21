@@ -45,10 +45,12 @@ struct uniform_t {
     std::string name;
 };
 
+// NOTE: Documents are rendered at 'src/rmsb_gui.cpp' render().
 struct document_t {
     std::string code;
     std::string desc;
     std::string name;
+    std::string link; // Link to website for more detailed info. (Not all documents use this)
     size_t num_newlines; // Used for rendering the text field correct size.
 };
 
@@ -60,7 +62,7 @@ class InternalLib {
         }
         
         void create_source();
-        void add_document     (const char* code, const char* description);
+        void add_document     (const char* code, const char* description, const char* link = NULL);
         void add_uniform      (struct uniform_t* u);
         void remove_uniform   (struct uniform_t* u);
         

@@ -26,7 +26,7 @@ void ErrorLog::render() {
     ImGui::SetNextWindowSize(ImVec2(ERRORLOG_WIDTH, ERRORLOG_HEIGHT));
     ImGui::Begin("Error Log", NULL,
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-
+    ImGui::SetWindowFontScale(1.3);
     for(std::string line : m_log) {
         ImGui::TextWrapped(line.c_str());
     }

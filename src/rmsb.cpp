@@ -11,27 +11,34 @@
 
 
 
-static bool g_listen_shader_log = false;
+static const char* const VERTEX_SHADER_CODE =
+"#version 430\n"
+"in vec3 vertexPosition;\n"
+"in vec2 vertexTexCoord;\n"
+"in vec4 vertexColor;\n"
+"uniform mat4 mvp;\n"
+"\n"
+"void main()\n"
+"{\n"
+"    gl_Position = mvp * vec4(vertexPosition, 1.0);\n"
+"}\n"
+;
 
 
-
+/*
 static void tracelog_callback(int log_level, const char* text, va_list args) {
 #define BUF_SIZE 4096
     char buf[BUF_SIZE] = { 0 };
     vsnprintf(buf, BUF_SIZE, text, args);
     puts(buf);
-
-    if(g_listen_shader_log
-    && (log_level == LOG_WARNING || log_level == LOG_ERROR)) {
-        ErrorLog& log = ErrorLog::get_instance();
-        log.add(buf);
-    }
-
 }
+*/
 
 void RMSB::init() {
-    printf("%s\n", __func__);
+    this->running = true;
 
+    SetTraceLogLevel(LOG_NONE);
+    
     InitWindow(
         DEFAULT_WIN_WIDTH,
         DEFAULT_WIN_HEIGHT,
@@ -40,7 +47,7 @@ void RMSB::init() {
     SetWindowMinSize(200, 200);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
     SetExitKey(0);
-    
+   
     this->gui.init();
 
     Editor::get_instance().init();
@@ -52,6 +59,9 @@ void RMSB::init() {
         m_infolog[i].enabled = 0;
     }
 
+    this->fallback_user_shader = true;
+    this->auto_reload = false;
+    this->auto_reload_delay = 3.0;
     this->input_key = 0;
     this->mode = EDIT_MODE;
     this->fps_limit = 300;
@@ -72,7 +82,8 @@ void RMSB::init() {
         .dir = (Vector3){ 0, 0, 0 },
         .yaw = 0,
         .pitch = 0,
-        .sensetivity = 0.1
+        .sensetivity = 0.1,
+        .move_speed = 10
     };
 
     char* data = LoadFileText(this->shader_filepath.c_str());
@@ -81,7 +92,7 @@ void RMSB::init() {
     Editor::get_instance().load_data(shader_code);
 
     SetTargetFPS(this->fps_limit);
-    SetTraceLogCallback(tracelog_callback);
+    //SetTraceLogCallback(tracelog_callback);
 
     
     ToggleBorderlessWindowed();
@@ -89,41 +100,19 @@ void RMSB::init() {
         
 void RMSB::quit() {
     printf("%s\n", __func__);
- 
+
+    if(this->shader.id > 0) {
+        unload_shader(&this->shader);
+    }
+
     this->gui.quit();
     CloseWindow();
 
 }
 
-/*
-void RMSB::toggle_fullscreen() {
-    ToggleBorderlessWindowed();
-    
-    int win_width = 0;
-    int win_height = 0;
-
-    if(!m_fullscreen) {
-        m_fullscreen = true;
-        int current_mon = GetCurrentMonitor();
-        win_width = GetMonitorWidth(current_mon);
-        win_height = GetMonitorHeight(current_mon);
-    }
-    else {
-        m_fullscreen = false;
-        win_width = m_winsize_nf.x;
-        win_height = m_winsize_nf.y;
-    }
-
-    m_winsize_nf = (Vector2){ (float)GetScreenWidth(), (float)GetScreenHeight() };
-    SetWindowSize(win_width, win_height);
-}*/
-
 void RMSB::update_camera() {
-    
-
     const float dt = GetFrameTime();
     Vector2 md = GetMouseDelta();
-
 
     this->camera.yaw -= (md.x * this->camera.sensetivity) * (M_PI/180.0);
     this->camera.pitch += (md.y * this->camera.sensetivity) * (M_PI/180.0);
@@ -134,7 +123,7 @@ void RMSB::update_camera() {
         (float)sin(this->camera.yaw+(M_PI/2)) * cos(-this->camera.pitch)
     };
 
-    const float speed = dt * 10.0;
+    const float speed = dt * this->camera.move_speed;
 
     if(IsKeyDown(KEY_W)) {
         this->camera.pos.x += cam_dir.x * speed;
@@ -210,7 +199,6 @@ void RMSB::render_shader() {
         }
     }
 
-
     shader_uniform_float(&this->shader, "time", &ftime);
     shader_uniform_float(&this->shader, "FOV", &this->fov);
     shader_uniform_float(&this->shader, "HIT_DISTANCE", &this->hit_distance);
@@ -267,7 +255,7 @@ void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
     std::string* type = &args[1];
     std::string* name = &args[2];
 
-    printf("NAME:'%s'\n", name->c_str());
+    //printf("NAME:'%s'\n", name->c_str());
 
     struct uniform_t uniform = {
         .type = -1,
@@ -303,15 +291,11 @@ void RMSB::run_shader_startup_cmd(const std::string* shader_code) {
     }
 
     begin_index += strlen(STARTUP_CMD_BEGIN_TAG)+1;
-
-    printf("%s\n", __func__);
-
     std::string line = "";
 
     for(size_t i = begin_index; i < end_index; i++) {
         char c = (*shader_code)[i];
         if(c == '\n') {
-            printf("\"%s\"\n", line.c_str());
             
             proccess_shader_startup_cmd_line(&line);
 
@@ -338,56 +322,118 @@ void RMSB::remove_startup_cmd_blocks(std::string* shader_code) {
 }
 
 
-void RMSB::reload_shader() {
-    if(this->shader_loaded)  {
-        UnloadShader(this->shader);
-        this->shader_loaded = false;
-        this->shader.id = 0;
+
+void RMSB::reload_shader(ReloadOption option) {
+ 
+    if(option == USER_FALLBACK_OPTION) {
+        if(this->fallback_user_shader) {
+            option = FALLBACK_TO_CURRENT;
+        }
+        else {
+            option = NO_FALLBACK;
+        }
     }
 
-    
+    // Reset shader uniform locations.
+    // New ones may be added or they maybe have changed.
     shader_util_reset_locations();
-    const char* file = this->shader_filepath.c_str();
-    if(!FileExists(file)) {
-        fprintf(stderr, "'%s': \"%s\" does not exists\n",
-                __func__, file);
-        return;
-    }
-   
-    ErrorLog::get_instance().clear();
-    std::string shader_code = Editor::get_instance().get_data_str();
     
-
+    ErrorLog::get_instance().clear();
+    
+   
+    std::string shader_code = Editor::get_instance().get_content();
+    
+    // Add user specified uniforms from the file
     if(m_first_shader_load) {
         run_shader_startup_cmd(&shader_code);
     }
 
     remove_startup_cmd_blocks(&shader_code);
 
-    // Get internal library code.
-    std::string code = InternalLib::get_instance().get_source() + shader_code;// + data;
+
+    // Merge user shader code and internal lib.
+    std::string code = InternalLib::get_instance().get_source();
+    code += shader_code;
     code += '\0';
 
-    // Load shader.
-    g_listen_shader_log = true;
-    this->shader = LoadShaderFromMemory(0, code.c_str());
-    
-    g_listen_shader_log = false;
 
-    if(this->shader.id > 0) {
-        this->shader_loaded = true;
+
+    if(option == NO_FALLBACK) {
+        if(this->shader.id > 0) {
+            unload_shader(&this->shader);
+        }
+        this->shader = load_shader_from_mem(VERTEX_SHADER_CODE, code.c_str());
+        this->shader_loaded = (this->shader.id > 0);
+    }
+    else
+    if(option == FALLBACK_TO_CURRENT) {
+        Shader tmp_shader = load_shader_from_mem(VERTEX_SHADER_CODE, code.c_str());
+        if(tmp_shader.id > 0) {
+            unload_shader(&this->shader);
+            this->shader = tmp_shader;
+            this->shader_loaded = true;
+        }
+        else {
+            unload_shader(&tmp_shader);
+        }
     }
 
+
+    //this->shader = LoadShaderFromMemory(0, code.c_str());
+
+    // 0 value for vertex shader will use raylib's default vertex shader.
+    //Shader tmp_shader = LoadShaderFromMemory(0, code.c_str());
+    /*
+    if(IsShaderValid(this->shader)) {
+        UnloadShader(this->shader);
+    }
+    */
+
+    /*
+    if(this->shader.id > 0) {
+        unload_shader(&this->shader);
+    }
+
+    // Compile and link shader.
+    this->shader = load_shader_from_mem(VERTEX_SHADER_CODE, code.c_str());
+    this->shader_loaded = (this->shader.id > 0);
+    */
+
+
+    /*
+    if(option == NO_FALLBACK) {
+        if(IsShaderValid(this->shader)) {
+            UnloadShader(this->shader);
+        }
+        this->shader = tmp_shader;
+        this->shader_loaded = (this->shader.id > 0);
+    }
+    else
+    if(option == FALLBACK_TO_CURRENT) {
+        bool tmp_shader_valid = IsShaderValid(tmp_shader);
+        if(tmp_shader_valid) {
+            UnloadShader(this->shader);
+            this->shader = tmp_shader;
+        }
+        else {
+            loginfo(PURPLE, "Unloaded temporary shader");
+            UnloadShader(tmp_shader);
+        }
+    }
+    */
+
+    // Tell user what happened.
+    if(option == NO_FALLBACK) {
+        if(IsShaderValid(this->shader)) {
+            loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
+        }
+        else {
+            loginfo(RED, "Shader failed to compile.");
+        }
+    }
+    
     if(this->reset_time_on_reload) {
         this->time = 0;
-    }
-
-    // Message.
-    if(IsShaderValid(this->shader)) {
-        loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
-    }
-    else {
-        loginfo(RED, "Compiling or linking failed.");
     }
     
     m_first_shader_load = false;

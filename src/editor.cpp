@@ -4,6 +4,7 @@
 
 #include "editor.hpp"
 #include "rmsb.hpp"
+#include "util.hpp"
 
 #define FONT_FILEPATH "./Px437_IBM_Model3x_Alt4.ttf"
 #define FONT_SPACING 1.0
@@ -48,6 +49,7 @@ void Editor::init() {
     this->opacity = 245;
     this->key_repeat_delay = 0.250;
     this->key_repeat_speed = 0.050;
+    this->diff_check_delay = 1.0;
     
     m_fontsize = 16;
     m_size = (Vector2){ 700, (float)(this->page_size * m_fontsize) };
@@ -60,11 +62,11 @@ void Editor::init() {
     m_key_repeat_timer = 0.0;
     m_multiline_comment = false;
     m_select.active = false;
+    m_cursor_preferred_x = 0;
 
     this->init_syntax_colors();
     this->clear();
     update_charsize();
-
 
     cursor.x = 0;
     cursor.y = 0;
@@ -90,9 +92,25 @@ void Editor::load_data(const std::string& data) {
         }
         line += data[i];
     }
+
+    reset_diff();
 }
-        
-std::string Editor::get_data_str() {
+
+void Editor::save(const std::string& filepath) {
+    SaveFileText(filepath.c_str(), (char*)(get_content().c_str()));
+    reset_diff();
+}
+
+void Editor::update_diff() {
+    this->content_changed = (m_content_hash != std::hash<std::string>{}(get_content()));
+}
+
+void Editor::reset_diff() {
+    this->content_changed = false;
+    m_content_hash = std::hash<std::string>{}(get_content());
+}
+
+std::string Editor::get_content() {
     std::string str = "";
 
     for(size_t i = 0; i < m_data.size(); i++) {
@@ -108,7 +126,7 @@ Color Editor::get_selectbg_color(int y) {
     y = (y*30 + (int)sin(y)*5) % 360 + GetTime()*80;
 
     //float hue = (int)(GetTime()*10.0) % 360;
-    return ColorFromHSV((float)y, 0.5, 0.5);
+    return ColorFromHSV((float)y, 0.5, 0.3);
 }
 
 void Editor::render(RMSB* rmsb) {
@@ -141,10 +159,16 @@ void Editor::render(RMSB* rmsb) {
             draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 0xFF });
         }
 
+        float ttext_x = (float)title.size() + 2;
+
         if(this->m_select.active) {
-            draw_text("(Select)", title.size()+2, -1, (Color){ 0x30, 0xB4, 0xD9, 0xFF });
+            draw_text("(Select)", ttext_x, -1, (Color){ 0x30, 0xB4, 0xD9, 0xFF });
+            ttext_x += 9.0;
         }
 
+        if(this->content_changed) {
+            draw_text("(unsaved)", ttext_x, -1, (Color){ 80, 50, 50, 0xFF });
+        }
     }
 
 
@@ -154,51 +178,7 @@ void Editor::render(RMSB* rmsb) {
 
 
     // Draw Selected region.
-    if(m_select.active) {
-
-
-        struct selectreg_t reg;
-        get_selected(&reg);
-
-        if(reg.start_y == reg.end_y) { /* One line selection. */
-            int width = reg.end_x - reg.start_x;
-            int rect_y = reg.start_y - m_scroll;
-            draw_rect(reg.start_x + m_margin, rect_y, width,
-                    1, get_selectbg_color(rect_y));
-        }
-        else { /* MultiLine selection */
-            
-
-            // Start Row.
-            int start_x_to_end = get_line(m_select.start_y)->size() - m_select.start_x;
-            int start_row_y = m_select.start_y - m_scroll;
-            draw_rect(
-                    m_margin + (m_select.start_x * !reg.inverted_y),
-                    start_row_y,
-                    reg.inverted_y ? m_select.start_x : start_x_to_end,
-                    1,
-                    get_selectbg_color(start_row_y)
-                    );
-
-            // End Row.
-            int end_row_y = m_select.end_y - m_scroll;
-            draw_rect(
-                    m_margin,
-                    end_row_y,
-                    m_select.end_x,
-                    1,
-                    get_selectbg_color(end_row_y)
-                    );
-
-
-            // Rows in between. 
-            for(uint64_t y = reg.start_y+1; y < reg.end_y; y++) {
-                size_t line_size = get_line(y)->size();
-                draw_rect(m_margin, y - m_scroll, (line_size != 0) ? line_size : 1, 
-                        1, get_selectbg_color(y - m_scroll));
-            }
-        }
-    }
+    draw_selected_reg();
 
     // Cursor
 
@@ -225,15 +205,18 @@ void Editor::render(RMSB* rmsb) {
     }
 
 
+    // Draw character at cursor position different color.
+    // NOTE: m_cursor.color.a is the blinking effect.
     char tmp[2] = {
         (*get_line(cursor.y))[cursor.x],
         '\0'
     };
-    draw_text(tmp, cursor.x + m_margin, cursor.y,
+    draw_text(tmp, cursor.x + m_margin, cursor.y - m_scroll,
             (Color){ 20, (unsigned char)(200 - m_cursor_color.a/2), 20, 255 });
 
 }
-        
+
+
 void Editor::update_charsize() {
 
     int byte_count = 0;
@@ -247,12 +230,25 @@ void Editor::update_charsize() {
     m_charsize.y = m_fontsize;
 }
 
+void Editor::start_selection() {
+    m_select.active = true;
+    m_select.start_x = cursor.x;
+    m_select.start_y = cursor.y;
+    if(m_prev_cursor.x > (int64_t)m_select.start_x) {
+        m_select.start_x++;
+    }
+    else
+    if(m_select.start_x > 0) {
+        m_select.start_x--;
+    }
+    // Selection end position has to be updated when
+    // the cursor moves. so this function will not handle it.
+}
+
 void Editor::handle_select_with_mouse() {
     if(m_cursor_moved && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
         if(!m_select.active) {
-            m_select.active = true;
-            m_select.start_x = cursor.x;
-            m_select.start_y = cursor.y;
+            start_selection();
         }
     }
     if(m_select.active) {
@@ -266,9 +262,7 @@ void Editor::handle_select_with_mouse() {
 
 void Editor::handle_select_with_keys() {
     if(!m_select.active) {
-        m_select.active = true;
-        m_select.start_x = cursor.x;
-        m_select.start_y = cursor.y;
+        start_selection();
     }
 
     m_select.end_x = cursor.x;
@@ -276,32 +270,7 @@ void Editor::handle_select_with_keys() {
 
 }
 
-void Editor::get_selected(struct selectreg_t* reg) {
-    *reg = m_select;
-
-    // Start and end has to be flipped if start index doesnt make sense.
-
-    reg->inverted_x = false;
-    reg->inverted_y = false;
-
-    if((reg->start_y == reg->end_y) && (reg->start_x > reg->end_x)) {
-        int tmp_x = reg->start_x;
-        reg->start_x = reg->end_x;
-        reg->end_x = tmp_x;
-        reg->inverted_x = true;
-    }
-
-    if(reg->end_y < reg->start_y) {
-        int tmp_y = reg->start_y;
-        reg->start_y = reg->end_y;
-        reg->end_y = tmp_y;
-        reg->inverted_y = true;
-    }
-
-}
-
-
-void Editor::update() {
+void Editor::update(RMSB* rmsb) {
     if(!this->open) {
         return;
     }
@@ -330,11 +299,11 @@ void Editor::update() {
 
     float mouse_wheel = GetMouseWheelMove();
     if(mouse_wheel > 0) {
-        move_cursor(0, -1);
+        move_cursor(0, -2);
     }
     else 
     if(mouse_wheel < 0) {
-        move_cursor(0, 1);
+        move_cursor(0, 2);
     }
 
 
@@ -349,7 +318,7 @@ void Editor::update() {
 
     m_background_color.a = this->opacity;
 
-    // Blinking.
+    // Cursor blink
     m_cursor_color.a = (unsigned char)(pow((sin(GetTime()*8)*0.5+0.5), 3.5)*200.0)+50;
     
     clamp_cursor();
@@ -363,11 +332,57 @@ void Editor::update() {
     if(IsKeyPressed(KEY_ESCAPE)) {
         m_select.active = false;
     }
+
+
+    // Update timers.
+
+    const float frame_dt = GetFrameTime();
+    m_idle_timer += frame_dt;
+   
+    if(rmsb->auto_reload
+    && (m_idle_timer >= rmsb->auto_reload_delay)) {
+        m_idle_timer = 0;
+        if(content_changed) {
+            printf("RELOAD?\n");
+            reset_diff();
+        }
+    }
+
+    m_diff_check_timer += frame_dt;
+    if(m_diff_check_timer >= this->diff_check_delay) {
+        m_diff_check_timer = 0;
+        update_diff();
+    }
+
 }
 
+void Editor::get_selected(struct selectreg_t* reg) {
+    *reg = m_select;
 
+    // Start and end has to be flipped if start index doesnt make sense.
 
-// Private functions:
+    reg->inverted_y = false;
+
+    if(reg->end_y < reg->start_y) {
+        int tmp_y = reg->start_y;
+        reg->start_y = reg->end_y;
+        reg->end_y = tmp_y;
+       
+        int tmp_x = reg->start_x;
+        reg->start_x = reg->end_x;
+        reg->end_x = tmp_x;
+        reg->inverted_y = true;
+    }
+    else
+    if(reg->start_x > reg->end_x
+    && (reg->end_y == reg->start_y)) {
+        int tmp_x = reg->start_x;
+        reg->start_x = reg->end_x;
+        reg->end_x = tmp_x;
+    }
+
+}
+
 
 std::string* Editor::get_line(int64_t y) {
     const size_t data_size = m_data.size();
@@ -444,7 +459,58 @@ int Editor::count_begin_tabs(std::string* str) {
     return num_tabs;
 }
 
+void Editor::remove_selected() {
+    if(!m_select.active) {
+        return;
+    }
+
+    struct selectreg_t reg;
+    get_selected(&reg);
+
+    // First and last line has to be processed separately.
+    std::string* first_line = get_line(reg.start_y);
+    std::string* last_line = get_line(reg.end_y);
+
+    if(reg.start_y == reg.end_y) { /* Remove one line selection */
+        first_line->erase(reg.start_x, reg.end_x - reg.start_x);
+        this->cursor.x = reg.start_x;
+    }
+    else { /* Remove multiline selection */
+
+        if(reg.start_x < first_line->size()) {
+            first_line->erase(reg.start_x, first_line->size() - reg.start_x);
+        }
+
+        const uint64_t lastsub_start = reg.end_x;
+        const int64_t lastsub_end = last_line->size() - reg.end_x;
+
+        if((lastsub_end > 0)
+        && (lastsub_end < (int64_t)last_line->size())) {
+            *first_line += last_line->substr(lastsub_start, lastsub_end);
+        }
+
+        // Delete lines in between
+        // last_line will also get deleted from the array
+        // if it will not have any data left.
+        m_data.erase(
+                m_data.begin() + reg.start_y + 1,
+                m_data.begin() + reg.end_y + 1//(preserve_lastln ? 0 : 1)
+                );
+
+        this->cursor.x = reg.start_x;
+        this->cursor.y = reg.start_y;
+    }
+        
+    m_select.active = false;
+    
+}
+
 void Editor::handle_backspace() {
+    if(m_select.active) {
+        remove_selected();
+        return;
+    }
+
     if(cursor.x > 0) {
         rem_char(cursor.x, cursor.y);
         move_cursor(-1, 0);
@@ -532,24 +598,53 @@ void Editor::clamp_cursor() {
     }
 }
 
+bool Editor::is_string_whitespace(std::string* str) {
+    bool ws = true;
+
+    for(size_t i = 0; i < str->size(); i++) {
+        if((*str)[i] != 0x20) {
+            ws = false;
+            break;
+        }
+    }
+
+    return ws;
+}
 
 void Editor::move_cursor_to(int64_t x, int64_t y) {
    
     int max_vrow = this->page_size + m_scroll;
+    int64_t y_diff = (y - cursor.y);
+    int64_t x_diff = (x - cursor.x);
 
-    // FIXME: Scroll may be "left behind" if Y was set to offscreen.
-    if(y >= max_vrow) {
-        m_scroll++;
+    if(
+    (y >= max_vrow) /* Scroll up */
+     ||
+    ((y < m_scroll) && (m_scroll > 0))) /* Scroll down */
+    {
+        m_scroll += y_diff;
+    }
+
+
+    if((y_diff != 0) && (x_diff == 0)) {
+        /* Line change, Update preferred column. */
+        if(cursor.x > 0
+        && !is_string_whitespace(get_line(cursor.y))
+        && m_cursor_preferred_x < cursor.x
+        ) {
+
+            m_cursor_preferred_x = cursor.x;
+        }
+        x = m_cursor_preferred_x;
     }
     else
-    if((y < m_scroll) && (m_scroll > 0)) {
-        m_scroll--;
+    if(y_diff == 0) {
+        m_cursor_preferred_x = x;
     }
 
     cursor.x = x;
     cursor.y = y;
     clamp_cursor();
-
 }
 
 void Editor::move_cursor(int xoff, int yoff) {
@@ -615,6 +710,8 @@ void Editor::handle_key_input(int bypassed_check) {
         add_tabs(cursor.x, cursor.y, 1);
         move_cursor(TAB_WIDTH, 0);
     }
+
+    m_idle_timer = 0;
 }
 
 
@@ -660,6 +757,64 @@ void Editor::handle_frame_key_inputs() {
     handle_key_input(0);
 }
 
+
+void Editor::draw_selected_reg() {
+    if(m_select.active) {
+
+        struct selectreg_t reg;
+        get_selected(&reg);
+
+        if(reg.start_y == reg.end_y) { /* Draw one line selection. */
+            int width = reg.end_x - reg.start_x;
+            int rect_y = reg.start_y - m_scroll;
+            draw_rect(reg.start_x + m_margin, rect_y, width,
+                    1, get_selectbg_color(rect_y));
+        }
+        else { /* Draw multiline selection */
+            
+
+            // Start Row. 
+            int start_x_to_end = get_line(m_select.start_y)->size() - m_select.start_x;
+            int start_row_y = m_select.start_y - m_scroll;
+            if(start_row_y >= 0 && start_row_y < this->page_size) {
+                draw_rect(
+                        m_margin + (m_select.start_x * !reg.inverted_y),
+                        start_row_y,
+                        reg.inverted_y ? m_select.start_x : start_x_to_end,
+                        1,
+                        get_selectbg_color(start_row_y)
+                        );
+            }
+
+
+            // End Row.
+            int end_x_to_end = get_line(m_select.end_y)->size() - m_select.end_x;
+            int end_row_y = m_select.end_y - m_scroll;
+            draw_rect(
+                    m_margin + (m_select.end_x * reg.inverted_y),
+                    end_row_y,
+                    reg.inverted_y ? end_x_to_end : m_select.end_x,
+                    1,
+                    get_selectbg_color(end_row_y)
+                    );
+
+
+            // Rows in between.
+            for(uint64_t y = reg.start_y+1; y < reg.end_y; y++) {
+                if(y >= (uint64_t)(m_scroll + this->page_size)) {
+                    break;
+                }
+                else
+                if(y < (uint64_t)m_scroll) {
+                    continue;
+                }
+                size_t line_size = get_line(y)->size();
+                draw_rect(m_margin, y - m_scroll, (line_size != 0) ? line_size : 1, 
+                        1, get_selectbg_color(y - m_scroll));
+            }
+        }
+    }
+}
 
 void Editor::draw_rect(int x, int y, int w, int h, Color color) {
     DrawRectangle(

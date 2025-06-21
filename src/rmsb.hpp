@@ -30,6 +30,7 @@ struct camera_t {
     float yaw;
     float pitch;
     float sensetivity;
+    float move_speed;
 };
 
 enum Mode {
@@ -37,9 +38,18 @@ enum Mode {
     EDIT_MODE
 };
 
+enum ReloadOption {
+    USER_FALLBACK_OPTION,
+    FALLBACK_TO_CURRENT,
+    NO_FALLBACK
+};
+
+
 
 class RMSB {
     public:
+        bool running;
+        
         Shader shader;
         bool shader_loaded;
         bool show_fps;
@@ -48,6 +58,8 @@ class RMSB {
 
         double time;
         float time_mult;
+        float auto_reload_delay;
+        bool auto_reload;
         bool time_paused;
         bool reset_time_on_reload;
         bool show_infolog;
@@ -67,8 +79,10 @@ class RMSB {
         void quit();
         void update();
 
+
         void render_shader();
-        void reload_shader();
+        void reload_shader(ReloadOption option);
+        bool fallback_user_shader;
 
         void loginfo(Color color, const char* text, ...);
         void render_infolog();

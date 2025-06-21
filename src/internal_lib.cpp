@@ -28,13 +28,6 @@ void InternalLib::create_source() {
     this->source += "#define PI2 (PI*2.0)\n";
     this->source += "#define PI_R (PI/180.0)\n";
     this->source += "#define ColorRGB(r,g,b) vec3(r/255.0, g/255.0, b/255.0)\n";
-    // Shape must have:
-    // - Diffuse,
-    // - Specular
-    // - Distance.
-    // - Shine.
-    // - ?...
-    //
 
 
     // Create some kind of region that can be found easily.
@@ -85,11 +78,6 @@ void InternalLib::create_source() {
             "Material map(vec3 p);"
             ,
             "User must define this function.\n"
-            "Material can be created like this:\n"
-            "  Material sphere = Material(0);\n"
-            "  Mdistance(sphere) = SphereSDF(p, 0.75);\n"
-            "  Mdiffuse(sphere)  = vec3(0.3, 0.4, 0.3);\n"
-            "  Mspecular(sphere) = vec3(0.5, 0.8, 0.5);\n"
             );
 
 
@@ -101,6 +89,8 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Signed distance to sphere.\n"
+            ,
+            "https://iquilezles.org/articles/distfunctions/"
             );
 
     // https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
@@ -191,8 +181,7 @@ void InternalLib::create_source() {
             " - Camera.pos should be where 'ray origin' is.\n"
             );
 
-    // https://iquilezles.org/articles/distfunctions/
-    // @ Infinite and limited Repetition
+    // https://iquilezles.org/articles/sdfrepetition/
     add_document(
             "vec3 RepeatINF(vec3 p, vec3 s)\n"
             "{\n"
@@ -202,6 +191,8 @@ void InternalLib::create_source() {
             "Repeat space \"infinite\".\n"
             "p: Current ray position.\n"
             "s: Grid size.\n"
+            ,
+            "https://iquilezles.org/articles/sdfrepetition/"
             );
     add_document(
             "vec3 RepeatLIM(vec3 p, vec3 s, vec3 lim)\n"
@@ -213,6 +204,8 @@ void InternalLib::create_source() {
             "p: Current ray position.\n"
             "s: Grid size\n"
             "lim: Limit\n"
+            ,
+            "https://iquilezles.org/articles/sdfrepetition/"
             );
 
 
@@ -256,6 +249,8 @@ void InternalLib::create_source() {
             "d: Color\n"
             "Example: \n"
             "'vec3 color = Palette(sin(time)*0.5+0.5, SOFT_PALETTE);'\n"
+            ,
+            "https://iquilezles.org/articles/palettes/"
             );
 
     add_document(
@@ -271,6 +266,7 @@ void InternalLib::create_source() {
             " - Camera input has to be enabled from View_Mode\n"
             );
 
+    // https://iquilezles.org/articles/fog/
     add_document(
             "vec3 ApplyFog(vec3 current_color, float t, vec3 fog_color)\n"
             "{\n"
@@ -280,11 +276,13 @@ void InternalLib::create_source() {
             ,
             "Returns color for the pixel.\n"
             "t: Distance. Ray.length can be used.\n"
+            ,
+            "https://iquilezles.org/articles/fog/"
             );
 }
 
 
-void InternalLib::add_document(const char* code, const char* description) {
+void InternalLib::add_document(const char* code, const char* description, const char* link) {
     if(!code) {
         fprintf(stderr, "'%s': code must not be empty.\n",
                 __func__);
@@ -303,10 +301,11 @@ void InternalLib::add_document(const char* code, const char* description) {
         .code = code,
         .desc = description,
         .name = "",
+        .link = !link ? "" : link,
         .num_newlines = 0
     };
 
-    // The first line of 'code'. is the name.
+    // The first line of 'code'. is the function name.
     // Also count the newlines, 
     //   it will be used for rendering text correct size later.
     bool read_name = true;

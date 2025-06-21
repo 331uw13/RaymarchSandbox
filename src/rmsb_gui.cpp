@@ -6,10 +6,10 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_glfw.h"
 
-
 #include "rmsb_gui.hpp"
 #include "rmsb.hpp"
 #include "shader_util.hpp"
+#include "error_log.hpp"
 
 #include "gui_tabs/uniforms_tab.hpp"
 #include "gui_tabs/settings_tab.hpp"
@@ -112,8 +112,12 @@ void RMSBGui::render(RMSB* rmsb) {
     //ImGui::ShowDemoWindow();
 
     if(this->open) {
+        int gui_height = GetScreenHeight();
+        if(!ErrorLog::get_instance().empty()) {
+            gui_height -= ERRORLOG_HEIGHT;
+        }
         ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, GetScreenHeight()));
+        ImGui::SetNextWindowSize(ImVec2(GUI_WIDTH, gui_height));
         ImGui::Begin("Gui", NULL, 
               ImGuiWindowFlags_NoMove
             | ImGuiWindowFlags_NoTitleBar
@@ -142,31 +146,6 @@ void RMSBGui::render(RMSB* rmsb) {
                 ImGui::EndTabBar();
             }
        
-            //SettingsTab::render(rmsb);
-            //UniformsTab::render(rmsb);
-
-
-
-
-            /*
-            if(ImGui::TreeNode("Inputs")) {
-
-                static char name_buf[32] = { 0 };
-
-                ImGui::Text("Uniform name:");
-                ImGui::SetKeyboardFocusHere();
-                ImGui::InputText("##UNIFORM_NAME", name_buf, sizeof(name_buf)-1);
-                ImGui::SameLine();
-                if(ImGui::Button("Add uniform")) {
-                    printf("Add '%s' | <type?>\n", name_buf);
-                }
-
-           
-                ImGui::TreePop();
-            }
-            */
-
-
             /*
             ImGui::SeparatorText("Compile settings");
             // TODO: Auto compile.
@@ -203,17 +182,24 @@ void RMSBGui::render(RMSB* rmsb) {
         for(struct document_t document : ilib.documents) {
             if(ImGui::CollapsingHeader(document.name.c_str())) {
                 ImGui::PushID(counter);
+
                 ImGui::Text(document.desc.c_str());
-                if(ImGui::TreeNode("Source")) {
+                if(!document.link.empty()) {
+                    ImGui::TextLink(document.link.c_str());
+                }
+                if(ImGui::TreeNodeEx("Source", ImGuiTreeNodeFlags_DefaultOpen)) {
 
                     const float draw_height = (document.num_newlines+2) * ImGui::GetFontSize();
+                    
                     ImGui::InputTextMultiline("##SOURCE", 
                             (char*)document.code.c_str()+'\0', document.code.size()+1,
                             ImVec2(FUNCTIONS_VIEW_WIDTH-50, draw_height), 
                             ImGuiInputTextFlags_ReadOnly);
                     ImGui::TreePop();
                 }
+
                 ImGui::PopID();
+                ImGui::Separator();
             }
             counter++;
         }

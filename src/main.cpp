@@ -27,7 +27,7 @@ void key_inputs(RMSB* rmsb) {
 
 void loop(RMSB* rmsb) {
 
-    while(!WindowShouldClose()) {
+    while(!WindowShouldClose() && rmsb->running) {
         key_inputs(rmsb);
         BeginDrawing();
         ClearBackground((Color){ 10, 10, 10, 255 });
@@ -41,7 +41,7 @@ void loop(RMSB* rmsb) {
 
         Editor& editor = Editor::get_instance();
         if(!rmsb->allow_camera_input) {
-            editor.update();
+            editor.update(rmsb);
         }
         editor.render(rmsb);
 
@@ -49,6 +49,7 @@ void loop(RMSB* rmsb) {
         if(rmsb->show_fps) {
             DrawFPS(10, GetScreenHeight()-20);
         }
+
 
         rmsb->input_key = 0;
         EndDrawing();
@@ -85,7 +86,7 @@ int main(int argc, char** argv) {
     rmsb.init();
 
     ilib.create_source();
-    rmsb.reload_shader();
+    rmsb.reload_shader(NO_FALLBACK);
 
     editor.title = shader_filepath;
 
