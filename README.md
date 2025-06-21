@@ -84,7 +84,7 @@ ADD VALUE test_value;
 ```
 
 
-## Updates
+## Recent Updates
 
 * Sat Jun 21 2025
 ```
