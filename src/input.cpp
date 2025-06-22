@@ -21,6 +21,7 @@ void InputHandler::handle_all_mode(RMSB* rmsb) {
     }
    
     Editor& editor = Editor::get_instance();
+    editor.char_input = 0;
 
     switch(rmsb->input_key) {
     

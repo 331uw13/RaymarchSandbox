@@ -44,8 +44,8 @@ void UniformsTab::render(RMSB* rmsb) {
     ImGui::Text("Name:");
     ImGui::SameLine();
     ImGui::InputText("##UNIFORM_NAME_INPUT", name_buf, sizeof(name_buf)-1);
+    Editor::get_instance().want_input = !ImGui::IsItemFocused();
     
-
     static int selected_index = 0;
 
     ImGui::Text("Type:");

@@ -80,6 +80,24 @@ void InternalLib::create_source() {
             "User must define this function.\n"
             );
 
+    add_document(
+            "Material MaterialMin(Material a, Material b)\n"
+            "{\n"
+            "   return (Mdistance(a) < Mdistance(b)) ? a : b;\n"
+            "}\n"
+            ,
+            "Returns material which distance is smaller.\n"
+            "Can be used to add Material to a 'map' function result or other things.\n"
+            );
+
+    add_document(
+            "Material MaterialMax(Material a, Material b)\n"
+            "{\n"
+            "   return (Mdistance(a) > Mdistance(b)) ? a : b;\n"
+            "}\n"
+            ,
+            "Returns material which distance is bigger."
+            );
 
     // https://iquilezles.org/articles/distfunctions/
     add_document(
@@ -89,6 +107,45 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Signed distance to sphere.\n"
+            ,
+            "https://iquilezles.org/articles/distfunctions/"
+            );
+    add_document(
+            "float BoxSDF(vec3 p, vec3 size)\n"
+            "{\n"
+            "   vec3 q = abs(p) - size;\n"
+            "   return length(max(q, 0.0)) + min(max(q.x, max(q.y,q .z)), 0.0);\n"
+            "}\n"
+            ,
+            "Signed distance to box.\n"
+            ,
+            "https://iquilezles.org/articles/distfunctions/"
+            );
+
+    add_document(
+            "float BoxFrameSDF(vec3 p, vec3 size, float e)\n"
+            "{\n"
+            "  p = abs(p) - size;\n"
+            "  vec3 q = abs(p + e) - e;\n"
+            "  return min(min(\n"
+            "   length(max(vec3(p.x,q.y,q.z),0.0))+min(max(p.x,max(q.y,q.z)),0.0),\n"
+            "   length(max(vec3(q.x,p.y,q.z),0.0))+min(max(q.x,max(p.y,q.z)),0.0)),\n"
+            "   length(max(vec3(q.x,q.y,p.z),0.0))+min(max(q.x,max(q.y,p.z)),0.0));\n"
+            "}\n"
+            ,
+            "Signed distance to box frame.\n"
+            ,
+            "https://iquilezles.org/articles/distfunctions/"
+            );
+
+    add_document(
+            "float TorusSDF(vec3 p, vec2 t)\n"
+            "{\n"
+            "   vec2 q = vec2(length(p.xz) - t.x, p.y);\n"
+            "   return length(q) - t.y;\n"
+            "}\n"
+            ,
+            "Signed distance to torus.\n"
             ,
             "https://iquilezles.org/articles/distfunctions/"
             );
@@ -123,16 +180,14 @@ void InternalLib::create_source() {
             "   Ray.hit = 0;\n"
             "   Ray.length = 0.0;\n"
             "   Ray.pos = ro;\n"
-            "   float E = 0.0;\n"
             "   for(; Ray.length < MAX_RAY_LENGTH; ) {\n"
             "      Ray.pos = ro + rd * Ray.length;\n"
             "      Material closest = map(Ray.pos);\n"
-            "      if(Mdistance(closest) <= (HIT_DISTANCE+E)) {\n"
+            "      if(Mdistance(closest) <= HIT_DISTANCE) {\n"
             "         Ray.hit = 1;\n"
             "         Ray.material = closest;\n"
             "         break;\n"
             "      }\n"
-            "      E += 0.000001;\n"
             "      Ray.length += Mdistance(closest);\n"
             "   }\n"
             "}\n"
@@ -180,6 +235,7 @@ void InternalLib::create_source() {
             " - Material must be valid.\n"
             " - Camera.pos should be where 'ray origin' is.\n"
             );
+
 
     // https://iquilezles.org/articles/sdfrepetition/
     add_document(

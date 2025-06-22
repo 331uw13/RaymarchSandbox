@@ -14,6 +14,10 @@
 unsigned int compile_shader(const char* shader_code, int shader_type) {
     unsigned int shader = 0;
     shader = glCreateShader(shader_type);
+
+    printf("===============================================\n");
+    printf("\033[32m%s\033[0m\n", shader_code);
+    printf("===============================================\n");
     glShaderSource(shader, 1, &shader_code, NULL);
 
     int shader_ok = 0;

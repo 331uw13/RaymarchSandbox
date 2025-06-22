@@ -82,8 +82,8 @@ void RMSB::init() {
         .dir = (Vector3){ 0, 0, 0 },
         .yaw = 0,
         .pitch = 0,
-        .sensetivity = 0.1,
-        .move_speed = 10
+        .sensetivity = 0.065,
+        .move_speed = 6
     };
 
     char* data = LoadFileText(this->shader_filepath.c_str());
@@ -318,6 +318,10 @@ void RMSB::remove_startup_cmd_blocks(std::string* shader_code) {
         return;
     }
 
+    if(begin_index > 0) {
+        begin_index--;
+    }
+
     shader_code->erase(begin_index, end_index);
 }
 
@@ -354,7 +358,7 @@ void RMSB::reload_shader(ReloadOption option) {
     // Merge user shader code and internal lib.
     std::string code = InternalLib::get_instance().get_source();
     code += shader_code;
-    code += '\0';
+    code.push_back('\0');
 
 
 

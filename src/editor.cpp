@@ -43,7 +43,8 @@ void Editor::init() {
     m_cursor_color = (Color){ 80, 200, 100, 255 };
     m_comment_color = (Color){ 120, 120, 120, 255 };
     m_selected_color = (Color){ 25, 55, 30, 255 };
-
+    
+    this->want_input = true;
     this->open = true;
     this->page_size = 40;
     this->opacity = 245;
@@ -78,7 +79,7 @@ void Editor::quit() {
 
 void Editor::clear() {
     m_data.clear();
-    m_data.push_back("");
+    //m_data.push_back("");
 }
 
 void Editor::load_data(const std::string& data) {
@@ -122,10 +123,7 @@ std::string Editor::get_content() {
         
         
 Color Editor::get_selectbg_color(int y) {
-
     y = (y*30 + (int)sin(y)*5) % 360 + GetTime()*80;
-
-    //float hue = (int)(GetTime()*10.0) % 360;
     return ColorFromHSV((float)y, 0.5, 0.3);
 }
 
@@ -562,6 +560,10 @@ void Editor::handle_enter() {
 
 
 void Editor::handle_char_inputs() {
+    if(!this->want_input) {
+        return;
+    }
+
     char c = this->char_input;
     if(c == 0) {
         return;
@@ -717,6 +719,9 @@ void Editor::handle_key_input(int bypassed_check) {
 
 
 void Editor::handle_frame_key_inputs() {
+    if(!this->want_input) {
+        return;
+    }
 
     const size_t num_keys = sizeof(INPUT_KEYS) / sizeof *INPUT_KEYS;
 
@@ -966,6 +971,11 @@ void Editor::init_syntax_colors() {
 
     m_color_map["Material"] = INTERNAL_TYPE;
 
+    m_color_map["SphereSDF"] = INTERNAL;
+    m_color_map["BoxSDF"] = INTERNAL;
+    m_color_map["TorusSDF"] = INTERNAL;
+    m_color_map["BoxFrameSDF"] = INTERNAL;
+    
     m_color_map["Mdiffuse"] = INTERNAL;
     m_color_map["Mspecular"] = INTERNAL;
     m_color_map["Mdistance"] = INTERNAL;
@@ -973,7 +983,6 @@ void Editor::init_syntax_colors() {
     m_color_map["ColorRGB"] = INTERNAL;
     m_color_map["Camera"] = GLOBAL;
     m_color_map["Ray"] = GLOBAL;
-    m_color_map["SphereSDF"] = INTERNAL;
     m_color_map["CameraInputRotation"] = INTERNAL;
     m_color_map["Noise"] = INTERNAL;
     m_color_map["RayDir"] = INTERNAL;
@@ -986,6 +995,8 @@ void Editor::init_syntax_colors() {
     m_color_map["RotateM2"] = INTERNAL;
     m_color_map["Palette"] = INTERNAL;
     m_color_map["ApplyFog"] = INTERNAL;
+    m_color_map["MaterialMin"] = INTERNAL;
+    m_color_map["MaterialMax"] = INTERNAL;
 
     m_color_map["="] = 0xD48646FF;
     m_color_map["=="] = 0xD48646FF;

@@ -48,6 +48,8 @@ class Editor {
         std::string get_content();
         bool content_changed;
 
+        bool want_input;
+
     // Settings:
         uint16_t page_size;
         float key_repeat_delay;
