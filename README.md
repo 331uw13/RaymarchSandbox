@@ -86,6 +86,12 @@ ADD VALUE test_value;
 
 ## Recent Updates
 
+* Sun Jun 22 2025
+```
+- Added more functions to internal lib.
+- Bug fixes.
+```
+
 * Sat Jun 21 2025
 ```
 - Updated GLSL editor to remove selected text and keep preferred column for cursor.
