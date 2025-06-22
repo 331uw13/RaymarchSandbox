@@ -1,6 +1,8 @@
 # RaymarchSandbox
 
-### Features
+#### Made with raylib (https://github.com/raysan5/raylib)  and imgui (https://github.com/ocornut/imgui)
+
+## Features
 * Built-in functions for raymarching.
 * Text editor with GLSL syntax highlight.
 * Custom uniform inputs.  (texture input not implemented yet.)
