@@ -9,6 +9,18 @@
 void SettingsTab::render(RMSB* rmsb) {
 
     if(ImGui::SmallButton(" Quit ")) {
+       
+        Editor& editor = Editor::get_instance();
+        if(editor.content_changed) {
+            int answer = rmsb->gui.ask_question(
+                    TextFormat("Warning: shader \"%s\" is not saved.", rmsb->shader_filepath.c_str()),
+                    { "Save and quit.", "Quit anyway!" });
+
+            if(answer == 0) {
+                editor.save(rmsb->shader_filepath.c_str());
+            }
+        }
+        
         rmsb->running = false;
     }
     ImGui::SameLine();

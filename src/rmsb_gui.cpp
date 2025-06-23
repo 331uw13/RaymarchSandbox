@@ -56,6 +56,7 @@ void RMSBGui::init() {
 
     this->view_functions = true;
     this->open = true;
+
 }
 
 void RMSBGui::quit() {
@@ -70,8 +71,8 @@ void RMSBGui::update() {
     char input_char = GetCharPressed();
     if(input_char != 0) {
         Editor& editor = Editor::get_instance();
-        if(editor.open) {
-            Editor::get_instance().char_input = input_char;
+        if(editor.open && editor.has_focus) {
+            editor.char_input = input_char;
         }
     }
 
@@ -217,5 +218,77 @@ void RMSBGui::render(RMSB* rmsb) {
    
 
 }
+        
+
+int RMSBGui::ask_question(const char* question, std::initializer_list<std::string_view> options) {
+    int res = -1;
+
+    EndDrawing(); // End current draw.
+    float alpha = 0;
+
+
+    Font font = Editor::get_instance().font;
+
+    Vector2 center = (Vector2){
+        GetScreenWidth() / 2 - 100,
+        GetScreenHeight() / 2,
+    };
+
+    while(res < 0) {
+        BeginDrawing();
+        Vector2 mouse = GetMousePosition();
+        
+        if(alpha < 50.0) {
+            alpha += GetFrameTime() * 300;
+        }
+
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){ 30, 17, 10, (uint8_t)alpha });
+
+        DrawTextEx(font, question, center, 16, 1.0, (Color){ 255, 240, 180, 255 });
+       
+        Vector2 option_pos = center;
+        option_pos.y += MeasureTextEx(font, question, 16, 1.0).y + 20;
+
+        int counter = 0;
+
+        for(std::string_view option_str : options) {
+
+            Vector2 text_size = MeasureTextEx(font, option_str.data(), 16, 1.0);
+
+            bool mouse_on_option
+                = (mouse.x > option_pos.x-10 && mouse.x < option_pos.x+text_size.x+10)
+                && (mouse.y > option_pos.y-2 && mouse.y < option_pos.y+text_size.y+2);
+
+            DrawRectangle(
+                    option_pos.x-10,
+                    option_pos.y-2,
+                    text_size.x+20,
+                    text_size.y+4,
+                    mouse_on_option ? (Color){ 70, 24, 20, 230 } : (Color){ 40, 20, 20, 200 }
+                    );
+
+            DrawTextEx(font, option_str.data(), option_pos, 16, 1.0, (Color){ 180, 180, 180, 255 });
+            
+
+            if(mouse_on_option && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                res = counter;
+            }
+
+            counter++;
+            option_pos.x += text_size.x + 30;
+        }
+        EndDrawing();
+    }
+
+    BeginDrawing();
+    return res;
+}
+
+
+
+
+
+
+
 
 

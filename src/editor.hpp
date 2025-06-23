@@ -48,7 +48,7 @@ class Editor {
         std::string get_content();
         bool content_changed;
 
-        bool want_input;
+        bool has_focus;
 
     // Settings:
         uint16_t page_size;
@@ -62,6 +62,8 @@ class Editor {
         float diff_check_delay;
         void reset_diff();
         void update_diff();
+        
+        Font font;
 
     private:
 
@@ -96,7 +98,6 @@ class Editor {
         void swap_line(int64_t y, int offset);
         void remove_selected();
 
-        Font font;
 
         void handle_key_input(int bypassed_check);
         void handle_char_inputs();

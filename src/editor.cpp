@@ -44,7 +44,7 @@ void Editor::init() {
     m_comment_color = (Color){ 120, 120, 120, 255 };
     m_selected_color = (Color){ 25, 55, 30, 255 };
     
-    this->want_input = true;
+    this->has_focus = false;
     this->open = true;
     this->page_size = 40;
     this->opacity = 245;
@@ -148,7 +148,12 @@ void Editor::render(RMSB* rmsb) {
             m_size.x, m_charsize.y + PADDING, /* Size */  
             dim_color(m_background_color, 0.8)
             );
-    draw_text(title.c_str(), 1, -1, m_foreground_color);
+
+    // Draw focus indicator
+    DrawCircle(m_pos.x+m_charsize.x, m_pos.y-m_charsize.y/2, 3.5,
+            this->has_focus ? (Color){ 30, 200, 30, 255 } : (Color){ 70, 70, 70, 255 });
+    
+    draw_text(title.c_str(), 2, -1, m_foreground_color);
 
     // Extra info for title bar.
     {
@@ -157,7 +162,7 @@ void Editor::render(RMSB* rmsb) {
             draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 0xFF });
         }
 
-        float ttext_x = (float)title.size() + 2;
+        float ttext_x = (float)title.size() + 3;
 
         if(this->m_select.active) {
             draw_text("(Select)", ttext_x, -1, (Color){ 0x30, 0xB4, 0xD9, 0xFF });
@@ -179,7 +184,6 @@ void Editor::render(RMSB* rmsb) {
     draw_selected_reg();
 
     // Cursor
-
     DrawRectangleRounded(
             (Rectangle) {
                 m_pos.x + (cursor.x + m_margin) * m_charsize.x,
@@ -290,10 +294,14 @@ void Editor::update(RMSB* rmsb) {
     }
     else
     if(mouse_on_editor && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        this->has_focus = true;   
         cursor.x = (mouse.x - m_pos.x - (m_margin * m_charsize.x)) / m_charsize.x;
         cursor.y = (mouse.y - m_pos.y + (m_scroll * m_charsize.y)) / m_charsize.y; 
     }
-
+    else
+    if(!mouse_on_editor && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        this->has_focus = false;
+    }
 
     float mouse_wheel = GetMouseWheelMove();
     if(mouse_wheel > 0) {
@@ -560,7 +568,7 @@ void Editor::handle_enter() {
 
 
 void Editor::handle_char_inputs() {
-    if(!this->want_input) {
+    if(!this->has_focus) {
         return;
     }
 
@@ -626,6 +634,9 @@ void Editor::move_cursor_to(int64_t x, int64_t y) {
     ((y < m_scroll) && (m_scroll > 0))) /* Scroll down */
     {
         m_scroll += y_diff;
+        if(m_scroll < 0) {
+            m_scroll = 0;
+        }
     }
 
 
@@ -719,7 +730,7 @@ void Editor::handle_key_input(int bypassed_check) {
 
 
 void Editor::handle_frame_key_inputs() {
-    if(!this->want_input) {
+    if(!this->has_focus) {
         return;
     }
 
@@ -997,6 +1008,12 @@ void Editor::init_syntax_colors() {
     m_color_map["ApplyFog"] = INTERNAL;
     m_color_map["MaterialMin"] = INTERNAL;
     m_color_map["MaterialMax"] = INTERNAL;
+    m_color_map["MixMaterial"] = INTERNAL;
+    m_color_map["BlendMaterials"] = INTERNAL;
+    m_color_map["SmoothVoronoi2D"] = INTERNAL;
+    m_color_map["SmoothVoronoi3D"] = INTERNAL;
+    m_color_map["Hash2"] = INTERNAL;
+    m_color_map["Hash3"] = INTERNAL;
 
     m_color_map["="] = 0xD48646FF;
     m_color_map["=="] = 0xD48646FF;

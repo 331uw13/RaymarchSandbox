@@ -28,7 +28,8 @@ void InternalLib::create_source() {
     this->source += "#define PI2 (PI*2.0)\n";
     this->source += "#define PI_R (PI/180.0)\n";
     this->source += "#define ColorRGB(r,g,b) vec3(r/255.0, g/255.0, b/255.0)\n";
-
+    this->source += "#define RAINBOW_PALETTE vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5),"
+                                             "vec3(1.0, 1.0, 1.0), vec3(0.0, 0.33, 0.67)\n";
 
     // Create some kind of region that can be found easily.
     // this will allow to edit the glsl code to have custom uniforms.
@@ -44,6 +45,7 @@ void InternalLib::create_source() {
         "#define Mspecular(x) x[1]\n"
         "#define Mdistance(x) x[2][0]\n"
         "#define Mshine(x)    x[2][1]\n"
+        "#define Mglow(x)     x[2][2]\n"
         ;
 
     this->source += MATERIAL_DEFINITIONS;
@@ -67,8 +69,9 @@ void InternalLib::create_source() {
             "{\n"
             "   int hit;\n"
             "   vec3 pos;\n"
-            "   Material material;\n"
             "   float length;\n"
+            "   Material material;\n"
+            "   Material closest;\n"
             "} Ray;\n"
             ,
             "'Raymarch(..)' functions set these global variables.\n"
@@ -97,6 +100,37 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Returns material which distance is bigger."
+            );
+
+    add_document(
+            "Material MixMaterial(Material a, Material b, float t)\n"
+            "{\n"
+            "  Material m = Material(0);\n"
+            "  Mdiffuse(m) = mix(Mdiffuse(a), Mdiffuse(b), t);\n"
+            "  Mdistance(m) = mix(Mdistance(a), Mdistance(b), t);\n"
+            "  Mspecular(m) = mix(Mspecular(a), Mspecular(b), t);\n"
+            "  Mdistance(m) = mix(Mdistance(a), Mdistance(b), t);\n"
+            "  Mshine(m)    = mix(Mshine(a), Mshine(b), t);\n"
+            "  return m;\n"
+            "}\n"
+            ,
+            ""
+            );
+
+    add_document(
+            "Material BlendMaterials(Material a, Material b, float k)\n"
+            "{\n"
+            "   float d1 = Mdistance(a);\n"
+            "   float d2 = Mdistance(b);\n"
+            "   float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);\n"
+            "   Material m = MixMaterial(b, a, h);\n"
+            "   Mdistance(m) -= k * h * (1.0-h);\n"
+            "   return m;\n"
+            "}\n"
+            ,
+            "Smooth Mix."
+            ,
+            "https://iquilezles.org/articles/distfunctions/"
             );
 
     // https://iquilezles.org/articles/distfunctions/
@@ -177,12 +211,19 @@ void InternalLib::create_source() {
             "void Raymarch(vec3 ro, vec3 rd)\n"
             "{\n"
             "   Ray.material = Material(0);\n"
+            "   Ray.closest = Material(0);\n"
+            "   Mdistance(Ray.closest) = MAX_RAY_LENGTH+1;\n"
+            "\n"
             "   Ray.hit = 0;\n"
             "   Ray.length = 0.0;\n"
             "   Ray.pos = ro;\n"
+            "\n"
             "   for(; Ray.length < MAX_RAY_LENGTH; ) {\n"
             "      Ray.pos = ro + rd * Ray.length;\n"
             "      Material closest = map(Ray.pos);\n"
+            "      if(Mglow(closest) > 0.0 && Mdistance(closest) < Mdistance(Ray.closest)) {\n"
+            "         Ray.closest = closest;\n"
+            "      }\n"
             "      if(Mdistance(closest) <= HIT_DISTANCE) {\n"
             "         Ray.hit = 1;\n"
             "         Ray.material = closest;\n"
@@ -216,10 +257,11 @@ void InternalLib::create_source() {
             "by sampling the same point but slightly different offsets.\n"
             );
 
+    // TODO: The light doesnt have radius currently.
     add_document(
             "vec3 ComputeLight(vec3 light_pos, vec3 color, vec3 normal, vec3 ray_pos, Material m)\n"
             "{\n"
-            "   vec3 light_dir = normalize(light_pos - abs(ray_pos));\n"
+            "   vec3 light_dir = -normalize(light_pos - ray_pos);\n"
             "   vec3 view_dir = normalize(Camera.pos - ray_pos);\n"
             "   vec3 halfway_dir = normalize(light_dir - view_dir);\n"
             "   float nh_dot = max(dot(normal, halfway_dir), 0.0);\n"
@@ -277,7 +319,7 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Returns 3x3 rotation matrix\n"
-            "Example: 'p.xyz *= ROTATE_m3(vec2(time, time*0.25));'\n"
+            "Example: 'p.xyz *= RotateM3(vec2(time, time*0.25));'\n"
             );
 
     add_document(
@@ -290,6 +332,7 @@ void InternalLib::create_source() {
             ,
             "Returns 2x2 rotation matrix\n"
             );
+
 
     // https://iquilezles.org/articles/palettes/
     add_document(
@@ -304,7 +347,7 @@ void InternalLib::create_source() {
             "c: Color\n"
             "d: Color\n"
             "Example: \n"
-            "'vec3 color = Palette(sin(time)*0.5+0.5, SOFT_PALETTE);'\n"
+            "'vec3 color = Palette(sin(time)*0.5+0.5, RAINBOW_PALETTE);'\n"
             ,
             "https://iquilezles.org/articles/palettes/"
             );
@@ -335,6 +378,81 @@ void InternalLib::create_source() {
             ,
             "https://iquilezles.org/articles/fog/"
             );
+
+    add_document(
+            "vec2 Hash2(vec2 x)\n"
+            "{\n"
+            "   return fract(sin(\n"
+            "      vec2(\n"
+            "         dot(x, vec2(95.28, 17.75)),\n"
+            "         dot(x, vec2(76.32, 32.71))\n"
+            "   ))*43758.5453);\n"
+            "}\n"
+            ,
+            "Returns a pseudo random 2D vector.\n"
+            );
+
+    add_document(
+            "vec3 Hash3(vec3 x)\n"
+            "{\n"
+            "   return fract(sin(\n"
+            "      vec3(\n"
+            "         dot(x, vec3(1.0, 57.0, 113.0)),\n"
+            "         dot(x, vec3(57.0, 113.0, 1.0)),\n"
+            "         dot(x, vec3(113.0, 1.0, 57.0))\n"
+            "   ))*43758.5453);\n"
+            "}\n"
+            ,
+            "Returns a pseudo random 3D vector.\n"
+            );
+
+    // https://iquilezles.org/articles/smoothvoronoi/
+    add_document(
+            "float SmoothVoronoi2D(vec2 x, float falloff, float k)\n"
+            "{\n"
+            "   vec2 p = floor(x);\n"
+            "   vec2 f = fract(x);\n"
+            "   float res = 0.0;\n"
+            "   for(int y = -1; y <= 1; y++) {\n"
+            "      for(int x = -1; x <= 1; x++) {\n"
+            "         vec2 b = vec2(float(x), float(y));\n"
+            "         vec2 r = vec2(b) - f + Hash2(p + b);\n"
+            "         float d = dot(r, r);\n"
+            "         res += 1.0 / pow(d, k);\n"
+            "      }\n"
+            "   }\n"
+            "   return pow(1.0 / res, 1.0/falloff);\n"
+            "}\n"
+            ,
+            ""
+            ,
+            "https://iquilezles.org/articles/smoothvoronoi/"
+            );
+
+    add_document(
+            "vec3 SmoothVoronoi3D(vec3 x, float falloff, float k)\n"
+            "{\n"
+            "   vec3 p = floor(x);\n"
+            "   vec3 f = fract(x);\n"
+            "   vec3 res = vec3(0.0);\n"
+            "   for(int z = -1; z <= 1; z++) {\n"
+            "      for(int y = -1; y <= 1; y++) {\n"
+            "         for(int x = -1; x <= 1; x++) {\n"
+            "            vec3 b = vec3(float(x), float(y), float(z));\n"
+            "            vec3 r = vec3(b) - f + Hash3(p + b);\n"
+            "            float d = dot(r, r);\n"
+            "            res += 1.0 / pow(d, k);\n"
+            "         }\n"
+            "      }\n"
+            "   }\n"
+            "   return pow(1.0 / res, vec3(1.0/falloff));\n"
+            "}\n"
+            ,
+            "Expanded into 3D from iq's Smooth voronoise.\n"
+            ,
+            "https://iquilezles.org/articles/smoothvoronoi/"
+            );
+
 }
 
 
