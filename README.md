@@ -88,6 +88,13 @@ ADD VALUE test_value;
 
 ## Recent Updates
 
+* Mon Jun 23
+```
+- "Quit" button will now ask to save the shader before quitting if necessary
+- Added noise functions to internal lib.
+- Small improvements
+```
+
 * Sun Jun 22 2025
 ```
 - Added more functions to internal lib.
