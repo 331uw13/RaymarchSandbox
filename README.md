@@ -13,8 +13,7 @@
 
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-2.png?raw=true)
-
-work in progress :)
+(screenshot not updated)
 
 -------------------------------------------------
 
@@ -28,8 +27,8 @@ git clone https://github.com/ocornut/imgui.git
 make
 ./rmsb example.glsl
 ```
-
-# The example shader.
+-------------------------------------------------
+## The example shader.
 ```glsl
 Material map(vec3 p) {
     Material test = Material(0);
@@ -85,8 +84,14 @@ ADD VALUE test_value;
 
 ```
 
-
+-------------------------------------------------
 ## Recent Updates
+
+* Thu Jun 26
+```
+- Added copy and cut of selected text functionality to GLSL editor.
+- Fixed editor focus issue
+```
 
 * Mon Jun 23
 ```
