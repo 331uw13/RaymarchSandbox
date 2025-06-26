@@ -49,6 +49,7 @@ class Editor {
         bool content_changed;
 
         bool has_focus;
+        bool mouse_hovered;
 
     // Settings:
         uint16_t page_size;
@@ -79,6 +80,8 @@ class Editor {
             bool active;
         } m_select;
 
+
+        std::string m_clipboard;
         
         std::map<std::string_view, int> m_color_map;
         Color get_keyword_color(char* buffer);
@@ -97,6 +100,8 @@ class Editor {
 
         void swap_line(int64_t y, int offset);
         void remove_selected();
+        void copy_selected();
+        void paste_clipboard();
 
 
         void handle_key_input(int bypassed_check);

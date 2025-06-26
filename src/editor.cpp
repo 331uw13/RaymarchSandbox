@@ -52,6 +52,7 @@ void Editor::init() {
     this->key_repeat_speed = 0.050;
     this->diff_check_delay = 1.0;
     
+    m_clipboard.clear();
     m_fontsize = 16;
     m_size = (Vector2){ 700, (float)(this->page_size * m_fontsize) };
     m_pos = (Vector2){ GUI_WIDTH+20, 300 };
@@ -236,6 +237,7 @@ void Editor::start_selection() {
     m_select.active = true;
     m_select.start_x = cursor.x;
     m_select.start_y = cursor.y;
+
     if(m_prev_cursor.x > (int64_t)m_select.start_x) {
         m_select.start_x++;
     }
@@ -251,8 +253,20 @@ void Editor::handle_select_with_mouse() {
     if(m_cursor_moved && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
         if(!m_select.active) {
             start_selection();
+
+            // When select mode is started with a mouse
+            // 'm_cursor_moved' must be used
+            // but it will only notice the current Y position.
+            // and not where it actually should start so it must be fixed.
+
+            if(m_prev_cursor.x == cursor.x && m_prev_cursor.y != cursor.y) {
+                m_select.start_x = m_prev_cursor.x;
+                m_select.start_y = m_prev_cursor.y;
+            }
         }
     }
+
+    // Selected region has to be updated.
     if(m_select.active) {
         m_select.end_x = cursor.x;
         m_select.end_y = cursor.y;
@@ -267,9 +281,9 @@ void Editor::handle_select_with_keys() {
         start_selection();
     }
 
+    // Update selected region.
     m_select.end_x = cursor.x;
     m_select.end_y = cursor.y;
-
 }
 
 void Editor::update(RMSB* rmsb) {
@@ -278,11 +292,13 @@ void Editor::update(RMSB* rmsb) {
     }
     Vector2 mouse = GetMousePosition();
 
-    bool mouse_on_editor = 
+    this->mouse_hovered = 
        (mouse.x > m_pos.x && mouse.x < m_pos.x + m_size.x)
     && (mouse.y > m_pos.y && mouse.y < m_pos.y + m_size.y);
 
-    if(mouse_on_editor && IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
+    this->has_focus = this->mouse_hovered;
+
+    if(this->mouse_hovered && IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
         if(!m_grab_offset_set) {
             m_grab_offset_set = true;
             m_grab_offset.x = m_pos.x - mouse.x;
@@ -293,23 +309,39 @@ void Editor::update(RMSB* rmsb) {
         m_pos.y = mouse.y + m_grab_offset.y;
     }
     else
-    if(mouse_on_editor && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        this->has_focus = true;   
+    if(this->mouse_hovered && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        //this->has_focus = true;   
         cursor.x = (mouse.x - m_pos.x - (m_margin * m_charsize.x)) / m_charsize.x;
         cursor.y = (mouse.y - m_pos.y + (m_scroll * m_charsize.y)) / m_charsize.y; 
     }
     else
-    if(!mouse_on_editor && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        this->has_focus = false;
+    if(!this->mouse_hovered && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        //this->has_focus = false;
     }
 
-    float mouse_wheel = GetMouseWheelMove();
-    if(mouse_wheel > 0) {
-        move_cursor(0, -2);
+
+    if(this->has_focus) {
+        float mouse_wheel = GetMouseWheelMove();
+        if(mouse_wheel > 0) {
+            move_cursor(0, -2);
+        }
+        else 
+        if(mouse_wheel < 0) {
+            move_cursor(0, 2);
+        }
     }
-    else 
-    if(mouse_wheel < 0) {
-        move_cursor(0, 2);
+
+    
+    if(m_select.active && (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_C))) {
+        copy_selected();
+    }
+    if(m_select.active && (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_D))) {
+        copy_selected();
+        m_select.active = true;
+        remove_selected();
+    }
+    if(!m_select.active && (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_V))) {
+        paste_clipboard();
     }
 
 
@@ -360,7 +392,6 @@ void Editor::update(RMSB* rmsb) {
         m_diff_check_timer = 0;
         update_diff();
     }
-
 }
 
 void Editor::get_selected(struct selectreg_t* reg) {
@@ -387,7 +418,91 @@ void Editor::get_selected(struct selectreg_t* reg) {
         reg->start_x = reg->end_x;
         reg->end_x = tmp_x;
     }
+}
 
+
+void Editor::copy_selected() {
+    m_clipboard.clear();
+
+    struct selectreg_t reg;
+    get_selected(&reg);
+
+    std::string* start_line = get_line(reg.start_y);
+    std::string* end_line = get_line(reg.end_y);
+
+    if(reg.start_y == reg.end_y) { /* Copy one line selection */
+        m_clipboard = start_line->substr(reg.start_x, reg.end_x - reg.start_x);
+    }
+    else { /* Copy multiline selection */
+
+        m_clipboard = start_line->substr(reg.start_x, start_line->size() - reg.start_x);
+        
+        m_clipboard.push_back('\n');
+        for(size_t y = reg.start_y+1; y < reg.end_y; y++) {
+            m_clipboard += *get_line(y) + '\n';
+        }
+
+        m_clipboard += end_line->substr(0, reg.end_x);
+    }
+
+    m_select.active = false;
+}
+
+void Editor::paste_clipboard() {
+    std::string* current = get_line(cursor.y);
+ 
+    // The first line length is needed to remove the "right substring"
+    // If the clipboard content is a multiline and it was pasted in middle of some text.
+    bool read_first_ln_size = true;
+    bool move_rsubstr = false;
+    int first_ln_size = 0;
+  
+    bool can_move_rsubstr = (cursor.x < (int64_t)current->size());
+    const std::string rsubstr
+        = can_move_rsubstr
+        ? current->substr(cursor.x, current->size() - cursor.x) : "";
+    
+
+    int iy = 0;
+    int ix = cursor.x;
+
+    for(size_t i = 0; i < m_clipboard.size(); i++) {
+        char c = m_clipboard[i];
+
+        int64_t y = cursor.y + iy;
+
+        if(c == '\n') {
+            m_data.insert(m_data.begin() + y+1, "");
+            iy++;
+            ix = 0;
+
+            move_rsubstr = true;
+            read_first_ln_size = false;
+            continue;
+        }
+
+        if(read_first_ln_size) {
+            first_ln_size++;
+        }
+        add_char(m_clipboard[i], ix, y);
+        ix++;
+    }
+
+    if(can_move_rsubstr && move_rsubstr) {
+        current = get_line(cursor.y); // Update pointer after insert.
+
+        const size_t erase_index = cursor.x + first_ln_size;
+        if(erase_index >= current->size()) {
+            fprintf(stderr, "%s: Trying to erase too much data.\n",
+                    __func__);
+            return;
+        }
+        current->erase(erase_index, current->size() - erase_index);
+        
+        // Now add the right substring back.
+        m_data.insert(m_data.begin() + cursor.y+iy+1, rsubstr);
+
+    }
 }
 
 

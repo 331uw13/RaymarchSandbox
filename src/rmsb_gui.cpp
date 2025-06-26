@@ -68,6 +68,7 @@ void RMSBGui::quit() {
 void RMSBGui::update() {
     ImGuiIO& io = ImGui::GetIO();
 
+
     char input_char = GetCharPressed();
     if(input_char != 0) {
         Editor& editor = Editor::get_instance();
@@ -80,10 +81,18 @@ void RMSBGui::update() {
         return;
     }
 
+    Editor& editor = Editor::get_instance();
+
 
     if(input_char != 0) {
         io.AddInputCharacter(input_char);
     }
+
+    if(editor.mouse_hovered) { 
+        io.MousePos = ImVec2(GetScreenWidth()/2, GetScreenHeight()/2);
+        return;
+    }
+
     io.DisplaySize = ImVec2((float)GetScreenWidth(), (float)GetScreenHeight());
 
     Vector2 mouse = GetMousePosition();
@@ -230,8 +239,8 @@ int RMSBGui::ask_question(const char* question, std::initializer_list<std::strin
     Font font = Editor::get_instance().font;
 
     Vector2 center = (Vector2){
-        GetScreenWidth() / 2 - 100,
-        GetScreenHeight() / 2,
+        (float)GetScreenWidth() / 2 - 100,
+        (float)GetScreenHeight() / 2,
     };
 
     while(res < 0) {
