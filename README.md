@@ -87,13 +87,13 @@ ADD VALUE test_value;
 -------------------------------------------------
 ## Recent Updates
 
-* Thu Jun 26
+* Thu Jun 26 2025
 ```
 - Added copy and cut of selected text functionality to GLSL editor.
 - Fixed editor focus issue
 ```
 
-* Mon Jun 23
+* Mon Jun 23 2025
 ```
 - "Quit" button will now ask to save the shader before quitting if necessary
 - Added noise functions to internal lib.
