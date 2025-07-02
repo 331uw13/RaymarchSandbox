@@ -14,7 +14,8 @@
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-2.png?raw=true)
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-3.png?raw=true)
-(screenshot not updated)
+
+### (screenshots are not updated)
 
 -------------------------------------------------
 
@@ -87,6 +88,13 @@ ADD VALUE test_value;
 
 -------------------------------------------------
 ## Recent Updates
+
+* Wed Jul 2 2025
+```
+- Moved to using compute shader for raymarching.
+- Internal library is now read from `internal.glsl` file
+- Added reflection option "MreflectN" for material.
+```
 
 * Thu Jun 26 2025
 ```
