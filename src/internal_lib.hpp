@@ -4,7 +4,7 @@
 #include <string>
 #include <list>
 #include <unordered_map>
-
+#include <cstdint>
 
 #define CUSTOM_UNIFORMS_TAG_BEGIN "//__tag__UNIFORMS_BEGIN\n"
 #define CUSTOM_UNIFORMS_TAG_END   "//__tag__UNIFORMS_END\n"
@@ -45,6 +45,12 @@ struct uniform_t {
     std::string name;
 };
 
+struct u8col_t {
+    uint8_t red;
+    uint8_t grn;
+    uint8_t blu;
+};
+
 // NOTE: Documents are rendered at 'src/rmsb_gui.cpp' render().
 struct document_t {
     std::string code;
@@ -52,6 +58,8 @@ struct document_t {
     std::string name;
     std::string link; // Link to website for more detailed info. (Not all documents use this)
     size_t num_newlines; // Used for rendering the text field correct size.
+
+    struct u8col_t color;
 };
 
 class InternalLib {
@@ -62,7 +70,8 @@ class InternalLib {
         }
         
         void create_source();
-        void add_document     (const char* code, const char* description, const char* link = NULL);
+        void add_document     (const char* code, const char* description, struct u8col_t color, const char* link = NULL);
+        void add_info         (const char* title, const char* description, struct u8col_t color, const char* link = NULL);
         void add_uniform      (struct uniform_t* u);
         void remove_uniform   (struct uniform_t* u);
         

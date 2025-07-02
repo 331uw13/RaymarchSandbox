@@ -2,10 +2,66 @@
 #include <string>
 #include <cstring>
 
+#include <fstream>
+
 #include "imgui.h"
 #include "internal_lib.hpp"
 
-#define GLSL_VERSION "#version 430\n"
+
+
+//#define UCOLOR_FUNC (u8col_t){ 70, 80, 150 }
+//#define UCOLOR_USRFUNC (u8col_t) { 150, 70, 130 }
+//#define UCOLOR_INFO (u8col_t){ 158, 80, 70 }
+//#define UCOLOR_STRUCT (u8col_t){ 130, 70, 150 }
+//#define UCOLOR_SDF (u8col_t){ 40, 150, 100 }
+
+
+static const struct u8col_t UCOLOR_INFO    = (u8col_t){ 130, 50, 60 };
+static const struct u8col_t UCOLOR_STRUCT  = (u8col_t){ 100, 70, 120 };
+static const struct u8col_t UCOLOR_USRFUNC = (u8col_t){ 100, 50, 80 };
+static const struct u8col_t UCOLOR_SDF     = (u8col_t){ 40, 100, 60 };
+static const struct u8col_t UCOLOR_FUNC    = (u8col_t){ 50, 40, 100 };
+
+
+static bool first_token_match(const std::string& line, const char* str, size_t* first_size_out) {
+    size_t i = line.find(" ", 0);
+    if(first_size_out) {
+        *first_size_out = i+1;
+    }
+    if(i == std::string::npos) {
+        return false;
+    }
+
+    return (line.substr(0, i) == str);
+}
+
+static bool str_contains(const std::string& str, size_t pos, const char* part, size_t part_size) {
+    const size_t str_size = str.size();
+    if(str_size == 0) {
+        return false;
+    }
+    if(pos >= str_size) {
+        pos = str_size-1;
+    }
+
+    bool isfound = false;
+    size_t k = 0;
+
+    for(size_t i = pos; i < str.size(); i++) {
+        if(str[i] != part[k]) {
+            k = 0;
+            continue;
+        }
+
+        k++;
+        if(k >= part_size) {
+            isfound = true;
+            break;
+        }
+    }
+
+    return isfound;
+}
 
 void InternalLib::create_source() {
     
@@ -13,9 +69,98 @@ void InternalLib::create_source() {
     this->documents.clear();
     this->uniforms.clear();
 
+    // Create some kind of region that can be found easily.
+    // this will allow to edit the glsl code to have custom uniforms.
+    // they can be added and removed at runtime.
+    this->source += CUSTOM_UNIFORMS_TAG_BEGIN;
+    this->source += "\n";
+    this->source += CUSTOM_UNIFORMS_TAG_END;
 
-    this->source += GLSL_VERSION;
-    this->source += "out vec4 out_color;\n";
+
+    // The reason why functions, structures and information about them
+    // is parsed in this kind of way is because it is convenient to have the documents 
+    // inside the tool itself.
+
+    std::ifstream file("internal.glsl");
+    std::string line;
+
+    bool read_code = false;
+    bool read_func_info = false;
+    std::string buf = "";
+    std::string info_buf = "";
+    struct u8col_t document_color = UCOLOR_INFO;
+
+
+    while(std::getline(file, line)) {
+       
+        if(line == "/* -INFO") { /* Start reading function info */
+            read_func_info = true;
+            info_buf.clear();
+            continue;
+        }
+
+        if(read_func_info) { /* Reading function info */
+            if(line == "*/") {
+                read_func_info = false;
+                continue;
+            }
+            info_buf += line + '\n';
+            continue;
+        }
+
+        size_t first_token_size = 0;
+        if(first_token_match(line, "FUNC", &first_token_size)) {
+            line.erase(0, first_token_size);
+            buf.clear();
+            read_code = true;
+
+
+            // Choose color for the document.
+            if(str_contains(line, first_token_size, "SDF", 3)) {
+                document_color = UCOLOR_SDF;
+            }
+            else
+            if(line[line.size()-1] == ';') {
+                document_color = UCOLOR_USRFUNC;
+            }
+            else {
+                document_color = UCOLOR_FUNC;
+            }
+        }
+        else
+        if(first_token_match(line, "struct", &first_token_size)) {
+            buf.clear();
+            read_code = true;
+            document_color = UCOLOR_STRUCT;
+        }
+        else
+        if((line == "FUNC_END")
+        || (line == "};") /* <- Structure/ubo/ssbo scope ended. */
+        ){
+            // All the info for document is now collected.
+            if(line != "FUNC_END") {
+                buf += line+'\n';
+            }
+            read_code = false;
+            add_document(buf.c_str(), info_buf.c_str(), document_color);
+            continue;
+        }
+
+        if(read_code) {
+            buf += line + '\n';
+            continue;
+        }
+
+
+        this->source += line + '\n';
+    }
+
+    printf("-----------------------------\n%s\n------------------------------\n",
+            this->source.c_str());
+
+    /*
+    this->source += "layout (local_size_x = 1, local_size_y = 1) in;\n";
+    this->source += "layout (rgba32f, binding = 8) uniform image2D output_img;\n";
     this->source += "uniform vec2 screen_size;\n";
     this->source += "uniform float time;\n";
     this->source += "uniform float FOV;\n";
@@ -40,49 +185,21 @@ void InternalLib::create_source() {
 
 
     const char* MATERIAL_DEFINITIONS = 
-        "#define Material mat3x3\n"
+        "#define Material mat4x4\n"
         "#define Mdiffuse(x)  x[0]\n"
         "#define Mspecular(x) x[1]\n"
         "#define Mdistance(x) x[2][0]\n"
         "#define Mshine(x)    x[2][1]\n"
         "#define Mglow(x)     x[2][2]\n"
         ;
+    */
 
-    this->source += MATERIAL_DEFINITIONS;
+    //printf("%s\n", this->source.c_str());
 
 
-    add_document(
-            "struct CAMERA_T\n"
-            "{\n"
-            "   vec3 pos;\n"
-            "   vec3 dir;\n"
-            "} Camera;\n"
-            ,
-            "Needed for light calculations\n"
-            "Camera position should be the view position\n"
-            "(usually the same as ray origin).\n"
-            "Camera direction is not yet used.\n"
-            );
 
-    add_document(
-            "struct RAY_T\n"
-            "{\n"
-            "   int hit;\n"
-            "   vec3 pos;\n"
-            "   float length;\n"
-            "   Material material;\n"
-            "   Material closest;\n"
-            "} Ray;\n"
-            ,
-            "'Raymarch(..)' functions set these global variables.\n"
-            );
 
-    add_document(
-            "Material map(vec3 p);"
-            ,
-            "User must define this function.\n"
-            );
-
+    /*
     add_document(
             "Material MaterialMin(Material a, Material b)\n"
             "{\n"
@@ -91,6 +208,8 @@ void InternalLib::create_source() {
             ,
             "Returns material which distance is smaller.\n"
             "Can be used to add Material to a 'map' function result or other things.\n"
+            ,
+            UCOLOR_FUNC
             );
 
     add_document(
@@ -100,6 +219,8 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Returns material which distance is bigger."
+            ,
+            UCOLOR_FUNC
             );
 
     add_document(
@@ -115,6 +236,8 @@ void InternalLib::create_source() {
             "}\n"
             ,
             ""
+            ,
+            UCOLOR_FUNC
             );
 
     add_document(
@@ -130,69 +253,21 @@ void InternalLib::create_source() {
             ,
             "Smooth Mix."
             ,
-            "https://iquilezles.org/articles/distfunctions/"
-            );
-
-    // https://iquilezles.org/articles/distfunctions/
-    add_document(
-            "float SphereSDF(vec3 p, float radius)\n"
-            "{\n"
-            "    return length(p)-radius;\n"
-            "}\n"
-            ,
-            "Signed distance to sphere.\n"
+            UCOLOR_FUNC
             ,
             "https://iquilezles.org/articles/distfunctions/"
             );
-    add_document(
-            "float BoxSDF(vec3 p, vec3 size)\n"
-            "{\n"
-            "   vec3 q = abs(p) - size;\n"
-            "   return length(max(q, 0.0)) + min(max(q.x, max(q.y,q .z)), 0.0);\n"
-            "}\n"
-            ,
-            "Signed distance to box.\n"
-            ,
-            "https://iquilezles.org/articles/distfunctions/"
-            );
-
-    add_document(
-            "float BoxFrameSDF(vec3 p, vec3 size, float e)\n"
-            "{\n"
-            "  p = abs(p) - size;\n"
-            "  vec3 q = abs(p + e) - e;\n"
-            "  return min(min(\n"
-            "   length(max(vec3(p.x,q.y,q.z),0.0))+min(max(p.x,max(q.y,q.z)),0.0),\n"
-            "   length(max(vec3(q.x,p.y,q.z),0.0))+min(max(q.x,max(p.y,q.z)),0.0)),\n"
-            "   length(max(vec3(q.x,q.y,p.z),0.0))+min(max(q.x,max(q.y,p.z)),0.0));\n"
-            "}\n"
-            ,
-            "Signed distance to box frame.\n"
-            ,
-            "https://iquilezles.org/articles/distfunctions/"
-            );
-
-    add_document(
-            "float TorusSDF(vec3 p, vec2 t)\n"
-            "{\n"
-            "   vec2 q = vec2(length(p.xz) - t.x, p.y);\n"
-            "   return length(q) - t.y;\n"
-            "}\n"
-            ,
-            "Signed distance to torus.\n"
-            ,
-            "https://iquilezles.org/articles/distfunctions/"
-            );
-
     // https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
     add_document(
-            "float Noise(vec2 xy, float seed)\n"
+            "float Noise(vec2 xy)\n"
             "{\n"
             "   float PHI = 1.61803398874989484820459;\n"
-            "   return fract(tan(distance(xy*PHI, xy) * seed)*xy.y);\n"
+            "   return fract(tan(distance(xy*PHI, xy))*xy.y);\n"
             "}\n"
             ,
             "Returns a pseudo random number.\n"
+            ,
+            UCOLOR_FUNC
             );
 
 
@@ -205,42 +280,10 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Calculates initial ray direction.\n"
+            ,
+            UCOLOR_FUNC
             );
 
-    add_document(
-            "void Raymarch(vec3 ro, vec3 rd)\n"
-            "{\n"
-            "   Ray.material = Material(0);\n"
-            "   Ray.closest = Material(0);\n"
-            "   Mdistance(Ray.closest) = MAX_RAY_LENGTH+1;\n"
-            "\n"
-            "   Ray.hit = 0;\n"
-            "   Ray.length = 0.0;\n"
-            "   Ray.pos = ro;\n"
-            "\n"
-            "   for(; Ray.length < MAX_RAY_LENGTH; ) {\n"
-            "      Ray.pos = ro + rd * Ray.length;\n"
-            "      Material closest = map(Ray.pos);\n"
-            "      if(Mglow(closest) > 0.0 && Mdistance(closest) < Mdistance(Ray.closest)) {\n"
-            "         Ray.closest = closest;\n"
-            "      }\n"
-            "      if(Mdistance(closest) <= HIT_DISTANCE) {\n"
-            "         Ray.hit = 1;\n"
-            "         Ray.material = closest;\n"
-            "         break;\n"
-            "      }\n"
-            "      Ray.length += Mdistance(closest);\n"
-            "   }\n"
-            "}\n"
-            ,
-            "ro: Ray origin\n"
-            "rd: Ray direction\n"
-            "Results of this function can be\n"
-            "accessed from 'Ray' struct.\n"
-            "Notes:\n"
-            " - rd must be normalized\n"
-            " - user must define 'map' function\n"
-            );
 
     add_document(
             "vec3 ComputeNormal(vec3 p)\n"
@@ -255,6 +298,8 @@ void InternalLib::create_source() {
             ,
             "This function will output normal for given point 'p'\n"
             "by sampling the same point but slightly different offsets.\n"
+            ,
+            UCOLOR_FUNC
             );
 
     // TODO: The light doesnt have radius currently.
@@ -276,64 +321,11 @@ void InternalLib::create_source() {
             " - Ambient color is _not_ set by this function.\n"
             " - Material must be valid.\n"
             " - Camera.pos should be where 'ray origin' is.\n"
+            ,
+            UCOLOR_FUNC
             );
-
-
-    // https://iquilezles.org/articles/sdfrepetition/
-    add_document(
-            "vec3 RepeatINF(vec3 p, vec3 s)\n"
-            "{\n"
-            "   return p - s * round(p / s);\n"
-            "}\n"
-            ,
-            "Repeat space \"infinite\".\n"
-            "p: Current ray position.\n"
-            "s: Grid size.\n"
-            ,
-            "https://iquilezles.org/articles/sdfrepetition/"
-            );
-    add_document(
-            "vec3 RepeatLIM(vec3 p, vec3 s, vec3 lim)\n"
-            "{\n"
-            "   return p - s * clamp(round(p / s), -lim, lim);\n"
-            "}\n"
-            ,
-            "Repeat space limited times.\n"
-            "p: Current ray position.\n"
-            "s: Grid size\n"
-            "lim: Limit\n"
-            ,
-            "https://iquilezles.org/articles/sdfrepetition/"
-            );
-
-
-    add_document(
-            "mat3 RotateM3(vec2 angle)\n"
-            "{\n"
-            "   vec2 c = cos(angle);\n"
-            "   vec2 s = sin(angle);\n"
-            "   return mat3(\n"
-            "      c.y,      0.0,  -s.y,\n"
-            "      s.y*s.x,  c.x,   c.y*s.x,\n"
-            "      s.y*c.x, -s.x,   c.y*c.x );\n"
-            "}\n"
-            ,
-            "Returns 3x3 rotation matrix\n"
-            "Example: 'p.xyz *= RotateM3(vec2(time, time*0.25));'\n"
-            );
-
-    add_document(
-            "mat2 RotateM2(float angle)\n"
-            "{\n"
-            "   float c = cos(angle);\n"
-            "   float s = sin(angle);\n"
-            "   return mat2(c, -s, s, c);\n"
-            "}\n"
-            ,
-            "Returns 2x2 rotation matrix\n"
-            );
-
-
+    */
+    /*
     // https://iquilezles.org/articles/palettes/
     add_document(
             "vec3 Palette(float t, vec3 a, vec3 b, vec3 c, vec3 d)\n"
@@ -349,6 +341,8 @@ void InternalLib::create_source() {
             "Example: \n"
             "'vec3 color = Palette(sin(time)*0.5+0.5, RAINBOW_PALETTE);'\n"
             ,
+            UCOLOR_FUNC
+            ,
             "https://iquilezles.org/articles/palettes/"
             );
 
@@ -363,6 +357,8 @@ void InternalLib::create_source() {
             "Returns new ray direction.\n"
             "Notes:\n"
             " - Camera input has to be enabled from View_Mode\n"
+            ,
+            UCOLOR_FUNC
             );
 
     // https://iquilezles.org/articles/fog/
@@ -375,6 +371,8 @@ void InternalLib::create_source() {
             ,
             "Returns color for the pixel.\n"
             "t: Distance. Ray.length can be used.\n"
+            ,
+            UCOLOR_FUNC
             ,
             "https://iquilezles.org/articles/fog/"
             );
@@ -390,6 +388,8 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Returns a pseudo random 2D vector.\n"
+            ,
+            UCOLOR_FUNC
             );
 
     add_document(
@@ -404,6 +404,8 @@ void InternalLib::create_source() {
             "}\n"
             ,
             "Returns a pseudo random 3D vector.\n"
+            ,
+            UCOLOR_FUNC
             );
 
     // https://iquilezles.org/articles/smoothvoronoi/
@@ -425,6 +427,8 @@ void InternalLib::create_source() {
             "}\n"
             ,
             ""
+            ,
+            UCOLOR_FUNC
             ,
             "https://iquilezles.org/articles/smoothvoronoi/"
             );
@@ -450,13 +454,16 @@ void InternalLib::create_source() {
             ,
             "Expanded into 3D from iq's Smooth voronoise.\n"
             ,
+            UCOLOR_FUNC
+            ,
             "https://iquilezles.org/articles/smoothvoronoi/"
             );
 
+    */
 }
 
 
-void InternalLib::add_document(const char* code, const char* description, const char* link) {
+void InternalLib::add_document(const char* code, const char* description, struct u8col_t color, const char* link) {
     if(!code) {
         fprintf(stderr, "'%s': code must not be empty.\n",
                 __func__);
@@ -476,7 +483,8 @@ void InternalLib::add_document(const char* code, const char* description, const 
         .desc = description,
         .name = "",
         .link = !link ? "" : link,
-        .num_newlines = 0
+        .num_newlines = 0,
+        .color = color
     };
 
     // The first line of 'code'. is the function name.
@@ -496,6 +504,31 @@ void InternalLib::add_document(const char* code, const char* description, const 
     }
 
     this->source += code;
+    this->documents.push_back(document);
+}
+        
+void InternalLib::add_info(const char* title, const char* description, struct u8col_t color, const char* link) {
+    if(!title) {
+        fprintf(stderr, "'%s': Info must have a title.\n",
+                __func__);
+        return;
+    }
+    if(!description) {
+        fprintf(stderr, "'%s': Info must have at least"
+                        " some kind of description.\n",
+                        __func__);
+        return;
+    }
+
+    struct document_t document = (struct document_t) {
+        .code = "<No source has been set>",
+        .desc = description,
+        .name = title,
+        .link = !link ? "" : link,
+        .num_newlines = 0,
+        .color = color
+    };
+
     this->documents.push_back(document);
 }
 

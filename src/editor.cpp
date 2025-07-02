@@ -314,10 +314,12 @@ void Editor::update(RMSB* rmsb) {
         cursor.x = (mouse.x - m_pos.x - (m_margin * m_charsize.x)) / m_charsize.x;
         cursor.y = (mouse.y - m_pos.y + (m_scroll * m_charsize.y)) / m_charsize.y; 
     }
+    /*
     else
     if(!this->mouse_hovered && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
         //this->has_focus = false;
     }
+    */
 
 
     if(this->has_focus) {
@@ -1094,6 +1096,7 @@ void Editor::init_syntax_colors() {
     const int INTERNAL = 0xA0C242FF;
     const int INTERNAL_TYPE = 0xBF8C56FF;
     const int GLOBAL = 0x2C9633FF;
+    const int PREPROC = 0x27C7D9FF;
 
     m_color_map["Material"] = INTERNAL_TYPE;
 
@@ -1101,20 +1104,24 @@ void Editor::init_syntax_colors() {
     m_color_map["BoxSDF"] = INTERNAL;
     m_color_map["TorusSDF"] = INTERNAL;
     m_color_map["BoxFrameSDF"] = INTERNAL;
-    
+   
+    m_color_map["#include"] = PREPROC;
+    m_color_map["#define"] = PREPROC;
+
     m_color_map["Mdiffuse"] = INTERNAL;
     m_color_map["Mspecular"] = INTERNAL;
     m_color_map["Mdistance"] = INTERNAL;
     m_color_map["Mshine"] = INTERNAL;
     m_color_map["ColorRGB"] = INTERNAL;
-    m_color_map["Camera"] = GLOBAL;
     m_color_map["Ray"] = GLOBAL;
     m_color_map["CameraInputRotation"] = INTERNAL;
+    m_color_map["CameraInputPosition"] = GLOBAL;
     m_color_map["Noise"] = INTERNAL;
-    m_color_map["RayDir"] = INTERNAL;
+    m_color_map["Raydir"] = INTERNAL;
     m_color_map["Raymarch"] = INTERNAL;
     m_color_map["ComputeNormal"] = INTERNAL;
-    m_color_map["ComputeLight"] = INTERNAL;
+    m_color_map["LightDirectional"] = INTERNAL;
+    m_color_map["LightPoint"] = INTERNAL;
     m_color_map["RepeatINF"] = INTERNAL;
     m_color_map["RepeatLIM"] = INTERNAL;
     m_color_map["RotateM3"] = INTERNAL;
@@ -1124,7 +1131,7 @@ void Editor::init_syntax_colors() {
     m_color_map["MaterialMin"] = INTERNAL;
     m_color_map["MaterialMax"] = INTERNAL;
     m_color_map["MixMaterial"] = INTERNAL;
-    m_color_map["BlendMaterials"] = INTERNAL;
+    m_color_map["SmoothMixMaterial"] = INTERNAL;
     m_color_map["SmoothVoronoi2D"] = INTERNAL;
     m_color_map["SmoothVoronoi3D"] = INTERNAL;
     m_color_map["Hash2"] = INTERNAL;

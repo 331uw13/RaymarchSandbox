@@ -9,6 +9,8 @@
 #include "error_log.hpp"
 #include "editor.hpp"
 
+#define GLSL_VERSION "#version 430\n"
+
 #define DEFAULT_WIN_WIDTH 1200
 #define DEFAULT_WIN_HEIGHT 800
 
@@ -45,13 +47,25 @@ enum ReloadOption {
 };
 
 
+struct texture_t {
+    uint32_t id;
+    int format;
+    int width;
+    int height;
+};
+
+// TODO: Something to debug the values?
+//
 
 class RMSB {
     public:
         bool running;
         
-        Shader shader;
-        bool shader_loaded;
+        Shader output_shader;
+        uint32_t compute_shader;
+        struct texture_t render_texture;
+        //uint32_t render_texture;
+
         bool show_fps;
 
         std::string shader_filepath;
@@ -72,6 +86,9 @@ class RMSB {
         float hit_distance;
         float max_ray_len;
 
+        int monitor_width;
+        int monitor_height;
+
         RMSBGui gui;
         struct camera_t camera;
 
@@ -79,6 +96,8 @@ class RMSB {
         void quit();
         void update();
 
+        uint32_t create_ssbo(int binding_point, size_t size);
+        struct texture_t create_empty_texture(int width, int height, int format);
 
         void render_shader();
         void reload_shader(ReloadOption option);
@@ -91,7 +110,9 @@ class RMSB {
 
         int input_key; // See 'src/input.cpp'
 
+
     private:
+
         bool m_first_shader_load;
         Vector2 m_screen_size_prev; // Changed by 'set_fullscreen()' function.
         Vector2 m_mouse_pos;

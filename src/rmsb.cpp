@@ -1,4 +1,7 @@
+
+#include "libs/glad.h"
 #include <raylib.h>
+
 #include <raymath.h>
 #include <rcamera.h>
 
@@ -8,22 +11,40 @@
 #include "imgui.h"
 #include "rmsb.hpp"
 #include "shader_util.hpp"
+#include "preproc.hpp"
+
+#include <rlgl.h>
 
 
-
-static const char* const VERTEX_SHADER_CODE =
-"#version 430\n"
+static const char* const OUT_VERTEX_SHADER_CODE =
+GLSL_VERSION
 "in vec3 vertexPosition;\n"
 "in vec2 vertexTexCoord;\n"
 "in vec4 vertexColor;\n"
+"out vec2 texcoords;\n"
 "uniform mat4 mvp;\n"
 "\n"
 "void main()\n"
 "{\n"
+"    texcoords = vertexTexCoord;\n"
 "    gl_Position = mvp * vec4(vertexPosition, 1.0);\n"
 "}\n"
 ;
 
+static const char* const OUT_FRAGMENT_SHADER_CODE =
+GLSL_VERSION
+
+"in vec2 texcoords;\n"
+"out vec4 out_color;"
+"uniform sampler2D fuckshit;\n"
+"uniform vec2 ures;\n"
+"\n"
+"void main()\n"
+"{\n"
+"    vec2 uv = (gl_FragCoord.xy) / ures;"
+"    out_color = texture(fuckshit, uv);\n"
+"}\n"
+;
 
 /*
 static void tracelog_callback(int log_level, const char* text, va_list args) {
@@ -44,7 +65,7 @@ void RMSB::init() {
         DEFAULT_WIN_HEIGHT,
         "Raymarch Sandbox"
     );
-    SetWindowMinSize(200, 200);
+    SetWindowMinSize(GUI_WIDTH+FUNCTIONS_VIEW_WIDTH, 600);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
     SetExitKey(0);
    
@@ -71,10 +92,9 @@ void RMSB::init() {
     this->time_mult = 1.0f;
     this->time = 0.0;
     this->file_read_timer = 0.0f;
-    this->shader_loaded = false;
     this->show_fps = true;
     this->fov = 60.0;
-    this->hit_distance = 0.000150;
+    this->hit_distance = 0.001000;
     this->max_ray_len = 500.0;
     this->allow_camera_input = false; 
     this->camera = (struct camera_t) {
@@ -87,22 +107,79 @@ void RMSB::init() {
     };
 
     char* data = LoadFileText(this->shader_filepath.c_str());
+    
     const std::string shader_code = data;
     UnloadFileText(data);
+    
     Editor::get_instance().load_data(shader_code);
 
     SetTargetFPS(this->fps_limit);
     //SetTraceLogCallback(tracelog_callback);
-
     
     ToggleBorderlessWindowed();
+
+    int current_mon = GetCurrentMonitor();
+    this->monitor_width = GetMonitorWidth(current_mon);
+    this->monitor_height = GetMonitorHeight(current_mon);
+
+    // Output shader to show the results.
+    this->output_shader = load_shader_from_mem(OUT_VERTEX_SHADER_CODE, OUT_FRAGMENT_SHADER_CODE);
+    
+    // This is the texture everything is rendered on.
+    this->render_texture = create_empty_texture(
+            this->monitor_width,
+            this->monitor_height,
+            GL_RGBA16F);
+
 }
-        
+
+struct texture_t RMSB::create_empty_texture(int width, int height, int format) {
+    struct texture_t tex;
+    tex.width = width;
+    tex.height = height;
+    tex.format = format;
+    tex.id = 0;
+
+	glGenTextures(1, &tex.id);
+	glBindTexture(GL_TEXTURE_2D, tex.id);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, format, tex.width, tex.height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    printf("%s: %ix%i\n", __func__, width, height);
+
+    return tex;
+}
+
+uint32_t RMSB::create_ssbo(int binding_point, size_t size) {
+    uint32_t ssbo = 0;
+
+    glGenBuffers(1, &ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_point, ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    return ssbo;
+}
+
 void RMSB::quit() {
     printf("%s\n", __func__);
 
-    if(this->shader.id > 0) {
-        unload_shader(&this->shader);
+    if(this->output_shader.id > 0) {
+        unload_shader(&this->output_shader);
+    }
+
+    if(this->compute_shader > 0) {
+        glDeleteProgram(this->compute_shader);
+    }
+
+    if(this->render_texture.id > 0) {
+        glDeleteTextures(1, &this->render_texture.id);
     }
 
     this->gui.quit();
@@ -168,50 +245,68 @@ void RMSB::update() {
     }
 }
 
-
 void RMSB::render_shader() {
-    if(!this->shader_loaded) {
-        return;
-    }
 
     const float ftime = (float)this->time;
-    Vector2 screen_size = (Vector2) {
-        (float)GetScreenWidth(), (float)GetScreenHeight()
+    Vector2 monitor_size = (Vector2) {
+        (float)this->monitor_width, (float)this->monitor_height
     };
 
-    BeginShaderMode(this->shader);
-
+    
     InternalLib& ilib = InternalLib::get_instance();
     for(struct uniform_t u : ilib.uniforms) {
 
         switch(u.type) {
             case UNIFORM_TYPE_COLOR:
-                SetShaderValue(this->shader, GetShaderLocation(this->shader, u.name.c_str()),
-                        u.values, SHADER_UNIFORM_VEC4);
+                shader_uniform_vec4(compute_shader, u.name.c_str(),
+                        (Vector4){ u.values[0], u.values[1], u.values[2], u.values[3] });
                 break;
             case UNIFORM_TYPE_VALUE:
-                SetShaderValue(this->shader, GetShaderLocation(this->shader, u.name.c_str()),
-                        &u.values[0], SHADER_UNIFORM_FLOAT);
+                shader_uniform_float(compute_shader, u.name.c_str(), u.values[0]);
+                //SetShaderValue(this->shader, GetShaderLocation(this->shader, u.name.c_str()),
+                //        &u.values[0], SHADER_UNIFORM_FLOAT);
                 break;
             case UNIFORM_TYPE_POSITION:
                 // ... TODO
                 break;
         }
     }
+    shader_uniform_float(compute_shader, "time", ftime);
+    shader_uniform_float(compute_shader, "FOV", this->fov);
+    shader_uniform_float(compute_shader, "HIT_DISTANCE", this->hit_distance);
+    shader_uniform_float(compute_shader, "MAX_RAY_LENGTH", this->max_ray_len);
+    shader_uniform_vec2(compute_shader, "monitor_size", monitor_size);
+    shader_uniform_vec3(compute_shader, "CameraInputPosition", this->camera.pos);
+    shader_uniform_float(compute_shader, "CAMERA_INPUT_YAW", this->camera.yaw);
+    shader_uniform_float(compute_shader, "CAMERA_INPUT_PITCH", this->camera.pitch);
 
-    shader_uniform_float(&this->shader, "time", &ftime);
-    shader_uniform_float(&this->shader, "FOV", &this->fov);
-    shader_uniform_float(&this->shader, "HIT_DISTANCE", &this->hit_distance);
-    shader_uniform_float(&this->shader, "MAX_RAY_LENGTH", &this->max_ray_len);
-    shader_uniform_vec2(&this->shader, "screen_size", &screen_size);
-    shader_uniform_vec3(&this->shader, "CAMERA_INPUT_POS", &this->camera.pos);
-    shader_uniform_float(&this->shader, "CAMERA_INPUT_YAW", &this->camera.yaw);
-    shader_uniform_float(&this->shader, "CAMERA_INPUT_PITCH", &this->camera.pitch);
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), WHITE);
+    glUseProgram(this->compute_shader);
+	glBindImageTexture(
+            8, // Binding point.
+            this->render_texture.id,
+            0,
+            GL_FALSE,
+            0,
+            GL_WRITE_ONLY,
+            this->render_texture.format
+            );
+
+    glDispatchCompute(this->render_texture.width / 8, this->render_texture.height / 8, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+   
+
+    // Draw the results from the compute shader.
+
+    BeginShaderMode(this->output_shader);
+    shader_uniform_vec2(this->output_shader.id, "ures", monitor_size);
+    rlEnableShader(this->output_shader.id);
+    rlSetUniformSampler(GetShaderLocation(this->output_shader, "fuckshit"), this->render_texture.id);
+   
+    DrawRectangle(0, 0, this->monitor_width, this->monitor_height, RED);
     EndShaderMode();
 }
-        
+    
 
 void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
 
@@ -356,12 +451,22 @@ void RMSB::reload_shader(ReloadOption option) {
 
 
     // Merge user shader code and internal lib.
-    std::string code = InternalLib::get_instance().get_source();
+    std::string code = "";
+    code += GLSL_VERSION;
+    Preproc::process_glsl(&shader_code, &code);
+
+    code += InternalLib::get_instance().get_source();
     code += shader_code;
     code.push_back('\0');
 
+    printf("TODO: Add back the fallback options.\n");
 
+    if(this->compute_shader > 0) {
+        glDeleteProgram(this->compute_shader);
+    }
+    this->compute_shader = load_compute_shader(code.c_str());
 
+    /*
     if(option == NO_FALLBACK) {
         if(this->shader.id > 0) {
             unload_shader(&this->shader);
@@ -381,9 +486,10 @@ void RMSB::reload_shader(ReloadOption option) {
             unload_shader(&tmp_shader);
         }
     }
+    */
 
     // Tell user what happened.
-    if(IsShaderValid(this->shader)) {
+    if(this->compute_shader > 0) {
         loginfo(GREEN, !m_first_shader_load ? "Shader Reloaded." : "Shader Loaded.");
     }
     else {

@@ -15,9 +15,11 @@ unsigned int compile_shader(const char* shader_code, int shader_type) {
     unsigned int shader = 0;
     shader = glCreateShader(shader_type);
 
+    /*
     printf("===============================================\n");
     printf("\033[32m%s\033[0m\n", shader_code);
     printf("===============================================\n");
+    */
     glShaderSource(shader, 1, &shader_code, NULL);
 
     int shader_ok = 0;
@@ -42,7 +44,7 @@ unsigned int compile_shader(const char* shader_code, int shader_type) {
      
             glGetShaderInfoLog(shader, log_max_len, &log_len, log);
     
-            //printf("%s: %s\n", __func__, log);
+            printf("%s: %s\n", __func__, log);
             ErrorLog::get_instance().add(log);
             free(log);
         }
@@ -174,7 +176,7 @@ Shader load_shader_from_mem(const char* vs_code, const char* fs_code) {
             }
      
             glGetProgramInfoLog(program, log_max_len, &log_len, log);
-            
+
             error_log.add(log);
             free(log);
         }
@@ -197,6 +199,30 @@ Shader load_shader_from_mem(const char* vs_code, const char* fs_code) {
 error:
     return shader;
 }
+
+uint32_t load_compute_shader(const char* code) {
+    uint32_t program = glCreateProgram();
+
+
+    uint32_t shader = compile_shader(code, GL_COMPUTE_SHADER);
+    if(shader == 0) {
+        printf("fuck.\n");
+        glDeleteProgram(program);
+        program = 0;
+        goto error;
+    }
+
+    glAttachShader(program, shader);
+    glLinkProgram(program);
+
+    glDetachShader(program, shader);
+    glDeleteShader(shader);
+
+
+error:
+    return program;
+}
+
 
 void unload_shader(Shader* shader) {
     if(shader->id > 0) {
@@ -251,14 +277,14 @@ not_valid:
 static std::map<std::string_view, int> g_locations;
 
 
-static int get_ulocation(Shader* shader, const char* name) {
+static int get_ulocation(uint32_t shader, const char* name) {
     auto e = g_locations.find(name);
     int loc = 0;
     if(e != g_locations.end()) {
         loc = g_locations[name];
     }
     else {
-        loc = GetShaderLocation(*shader, name);
+        loc = glGetUniformLocation(shader, name);
         if(loc >= 0) {
             g_locations[name] = loc;
         }
@@ -270,16 +296,24 @@ void shader_util_reset_locations() {
     g_locations.clear();
 }
 
-void shader_uniform_float (Shader* shader, const char* name, const float* value) {
-    SetShaderValue(*shader, get_ulocation(shader, name), value, SHADER_UNIFORM_FLOAT);
+void shader_uniform_float (uint32_t shader, const char* name, const float& value) {
+    glUseProgram(shader);
+    glUniform1f(get_ulocation(shader, name), value);
 }
 
-void shader_uniform_vec2  (Shader* shader, const char* name, const Vector2* value) {
-    SetShaderValue(*shader, get_ulocation(shader, name), value, SHADER_UNIFORM_VEC2);
+void shader_uniform_vec2  (uint32_t shader, const char* name, const Vector2& value) {
+    glUseProgram(shader);
+    glUniform2f(get_ulocation(shader, name), value.x, value.y);
 }
 
-void shader_uniform_vec3  (Shader* shader, const char* name, const Vector3* value) {
-    SetShaderValue(*shader, get_ulocation(shader, name), value, SHADER_UNIFORM_VEC3);
+void shader_uniform_vec3  (uint32_t shader, const char* name, const Vector3& value) {
+    glUseProgram(shader);
+    glUniform3f(get_ulocation(shader, name), value.x, value.y, value.z);
+}
+
+void shader_uniform_vec4  (uint32_t shader, const char* name, const Vector4& value) {
+    glUseProgram(shader);
+    glUniform4f(get_ulocation(shader, name), value.x, value.y, value.z, value.w);
 }
 
 

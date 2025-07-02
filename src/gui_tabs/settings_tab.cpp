@@ -57,7 +57,7 @@ void SettingsTab::render(RMSB* rmsb) {
                 "Field of view: %f");
 
         ImGui::SliderFloat("##HIT_DISTANCE",
-                &rmsb->hit_distance, 0.000001, 0.001,
+                &rmsb->hit_distance, 0.0001, 0.01,
                 "Hit distance: %f");
 
         ImGui::SliderFloat("##MAX_RAY_LENGTH",

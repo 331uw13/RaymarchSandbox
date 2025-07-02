@@ -189,7 +189,22 @@ void RMSBGui::render(RMSB* rmsb) {
                );
         ImGui::SetWindowFontScale(1.0);
         int counter = 0;
+    
+    
+        ImVec4* colors = ImGui::GetStyle().Colors;
+        ImVec4 original_header_color = colors[ImGuiCol_Header];
+
+        //colors[ImGuiCol_Header] = ImVec4(0.57f, 0.28f, 0.22f, 0.31f);
+
         for(struct document_t document : ilib.documents) {
+
+            colors[ImGuiCol_Header] = ImVec4(
+                    (float)document.color.red / 255.0,
+                    (float)document.color.grn / 255.0,
+                    (float)document.color.blu / 255.0,
+                    1.0
+                    );
+
             if(ImGui::CollapsingHeader(document.name.c_str())) {
                 ImGui::PushID(counter);
 
@@ -214,6 +229,8 @@ void RMSBGui::render(RMSB* rmsb) {
             counter++;
         }
         ImGui::End();
+        
+        colors[ImGuiCol_Header] = original_header_color;
     }
 
 
