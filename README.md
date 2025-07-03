@@ -33,6 +33,13 @@ make
 -------------------------------------------------
 ## Recent Updates
 
+* Thu Jul 3 2025
+```
+- Custom uniform inputs will now remember their values even when restarted.
+- Reflections now work with fog correctly.
+- Small improvements.
+```
+
 * Wed Jul 2 2025
 ```
 - Moved to using compute shader for raymarching.
@@ -51,20 +58,6 @@ make
 - "Quit" button will now ask to save the shader before quitting if necessary
 - Added noise functions to internal lib.
 - Small improvements
-```
-
-* Sun Jun 22 2025
-```
-- Added more functions to internal lib.
-- Bug fixes.
-```
-
-* Sat Jun 21 2025
-```
-- Updated GLSL editor to remove selected text and keep preferred column for cursor.
-- Other small updates and bug fixes for the editor.
-- Added auto reload option and delay for it.
-- Added fallback option. User can choose to fallback to previous working shader or not.
 ```
 
 
