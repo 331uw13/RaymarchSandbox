@@ -42,6 +42,7 @@ struct RAY_T
     float len;
     Material mat;
     Material closest_mat;
+    float reflect_len;
     Material reflectoff_mat;
 };
 RAY_T Ray;
@@ -119,12 +120,11 @@ FUNC_END
 // "private" function.
 void _Iraymarch_reflect(vec3 ro, vec3 rd)
 {
-    Ray.len = 0;
+    Ray.reflect_len = 0.0;
     Ray.pos = ro;
-    Ray.reflectoff_mat = Ray.mat;
 
-    while(Ray.len < MAX_RAY_LENGTH) {
-        Ray.pos = ro + rd * Ray.len;
+    while(Ray.reflect_len < MAX_RAY_LENGTH) {
+        Ray.pos = ro + rd * Ray.reflect_len;
 
         Material c = map(Ray.pos);
         if(Mdistance(c) <= HIT_DISTANCE) {
@@ -134,7 +134,7 @@ void _Iraymarch_reflect(vec3 ro, vec3 rd)
             break;
         }
 
-        Ray.len += Mdistance(c);
+        Ray.reflect_len += Mdistance(c);
     }
 }
 
@@ -181,6 +181,7 @@ FUNC void Raymarch(vec3 ro, vec3 rd)
 
             int num_r = int(round(MreflectN(c)));
             if(num_r > 0) {
+                Ray.reflectoff_mat = Ray.mat;
                 vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
                 vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
                 _Iraymarch_reflect(new_ro, new_rd);
@@ -240,6 +241,7 @@ FUNC Material SmoothMixMaterial(Material a, Material b, float k)
     return m;
 }
 FUNC_END
+
 
 /* -INFO
 Calculate light values for the material 'm'
@@ -307,11 +309,26 @@ https://iquilezles.org/articles/fog/
 */
 FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color)
 {
-    if(MreflectN(Ray.reflectoff_mat) > 0) {
-        fog_color = mix(Mdiffuse(Ray.reflectoff_mat), fog_color, 0.5);
+    if(MreflectN(Ray.reflectoff_mat) > 0) { /* Shape is reflective */
+
+        // Fog has to be applied to the reflection ray
+        // and the shape itself.
+
+        // Mix fog and the shape color which the ray reflected off.
+        vec3 fog_color_refl = mix(Mdiffuse(Ray.reflectoff_mat), fog_color, 0.5);
+        float fog_amount_refl = 1.0 - exp(-(Ray.reflect_len*0.01) * density);
+        
+        vec3 color = mix(current_color, fog_color_refl, fog_amount_refl);
+
+        float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
+        return mix(color, fog_color, fog_amount);
     }
-    float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
-    return mix(current_color, fog_color, fog_amount);
+    else { /* Non-reflective */
+        float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
+        return mix(current_color, fog_color, fog_amount);
+    }
+
+    return current_color;
 }
 FUNC_END
 
@@ -384,6 +401,28 @@ FUNC float SmoothVoronoi3D(vec3 x, float falloff, float k)
 }
 FUNC_END
 
+/* -INFO
+https://iquilezles.org/articles/sdfrepetition/
+Repeat space infinite
+*/
+FUNC vec3 RepeatINF(vec3 p, vec3 s)
+{
+    return p - s * round(p / s);
+}
+FUNC_END
+
+/* -INFO
+https://iquilezles.org/articles/sdfrepetition/
+Repeat space limited
+*/
+FUNC vec3 RepeatLIM(vec3 p, vec3 s, vec3 lim)
+{
+    return p - s * clamp(round(p / s), -lim, lim);
+}
+FUNC_END
+
+
+// ----- Signed Distance Functions -----
 
 /* -INFO
 https://iquilezles.org/articles/distfunctions/
@@ -405,6 +444,80 @@ FUNC float BoxSDF(vec3 p, vec3 size)
     return length(max(q, 0.0)) + min(max(q.x, max(q.y,q .z)), 0.0);
 }
 FUNC_END
+
+
+/* -INFO
+https://iquilezles.org/articles/distfunctions/
+Signed distance to box frame.
+   - e is the frame size.
+*/
+FUNC float BoxFrameSDF(vec3 p, vec3 size, float e)
+{
+    p = abs(p)-size;
+    vec3 q = abs(p+e)-e;
+    return min(min(
+        length(max(vec3(p.x,q.y,q.z),0.0))+min(max(p.x,max(q.y,q.z)),0.0),
+        length(max(vec3(q.x,p.y,q.z),0.0))+min(max(q.x,max(p.y,q.z)),0.0)),
+        length(max(vec3(q.x,q.y,p.z),0.0))+min(max(q.x,max(q.y,p.z)),0.0));
+}
+FUNC_END
+
+
+/* -INFO
+https://iquilezles.org/articles/distfunctions/
+Signed distance to torus.
+*/
+FUNC float TorusSDF(vec3 p, vec2 t)
+{
+    vec2 q = vec2(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
+}
+FUNC_END
+
+
+/* -INFO
+https://iquilezles.org/articles/distfunctions/
+Signed distance to line.
+   - h is the line height.
+   - r is the radius/width.
+*/
+FUNC float LineSDF(vec3 p, float h, float r)
+{
+    p.y -= clamp(p.y, 0.0, h);
+    return length(p) - r;
+}
+FUNC_END
+
+
+
+/* -INFO
+https://iquilezles.org/articles/distfunctions/
+Signed distance to cylinder
+   - h is the height
+   - r is the radius/width
+*/
+FUNC float CylinderSDF(vec3 p, float h, float r)
+{
+    vec2 d = abs(vec2(length(p.xz),p.y)) - vec2(r,h);
+    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+FUNC_END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

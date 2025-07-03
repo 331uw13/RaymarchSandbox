@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
     rmsb.init();
 
     ilib.create_source();
-    rmsb.reload_shader(NO_FALLBACK);
+    rmsb.reload_shader();
 
     editor.title = shader_filepath;
 

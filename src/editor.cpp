@@ -99,7 +99,20 @@ void Editor::load_data(const std::string& data) {
 }
 
 void Editor::save(const std::string& filepath) {
-    SaveFileText(filepath.c_str(), (char*)(get_content().c_str()));
+
+    std::string content = get_content();
+
+    InternalLib& ilib = InternalLib::get_instance();
+    for(struct uniform_t u : ilib.uniforms) {
+        set_startupcmd_values(
+                content,
+                u.name.c_str(),
+                u.values
+                );
+    }
+
+
+    SaveFileText(filepath.c_str(), (char*)content.c_str());
     reset_diff();
 }
 
@@ -160,19 +173,23 @@ void Editor::render(RMSB* rmsb) {
     {
         if(rmsb->mode == EDIT_MODE) {
             int num_cols = m_size.x / m_charsize.x;
-            draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 0xFF });
+            draw_text("(Edit_Mode)", num_cols-12, -1, (Color){ 0x39, 0xA8, 0x44, 255 });
         }
+        
 
         float ttext_x = (float)title.size() + 3;
 
         if(this->m_select.active) {
-            draw_text("(Select)", ttext_x, -1, (Color){ 0x30, 0xB4, 0xD9, 0xFF });
+            draw_text("(Select)", ttext_x, -1, (Color){ 0x30, 0xB4, 0xD9, 255 });
             ttext_x += 9.0;
         }
 
         if(this->content_changed) {
-            draw_text("(unsaved)", ttext_x, -1, (Color){ 80, 50, 50, 0xFF });
+            draw_text("(unsaved)", ttext_x, -1, (Color){ 80, 50, 50, 255 });
+            ttext_x += 10.0;
         }
+
+        draw_text(TextFormat("(%li)", m_data.size()), ttext_x, -1, (Color){ 120, 100, 100, 200 });
     }
 
 
@@ -384,7 +401,7 @@ void Editor::update(RMSB* rmsb) {
         m_idle_timer = 0;
         if(content_changed) {
             //printf("RELOAD?\n");
-            rmsb->reload_shader(USER_FALLBACK_OPTION);
+            rmsb->reload_shader();
             reset_diff();
         }
     }

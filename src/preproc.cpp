@@ -84,9 +84,6 @@ void Preproc::process_glsl(std::string* shader_code, std::string* outdef) {
         struct tag_t* tag = &include_tags[i];
     
 
-        if(compare(tag->pstr, tag->size, "RAY_REFLECTION", 14)) {
-            *outdef += "#define I_INCLUDE_RAY_REFLECTION 1\n";
-        }
         
 
         shader_code->erase(tag->index, tag->end - tag->index);

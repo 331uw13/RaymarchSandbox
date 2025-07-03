@@ -17,7 +17,7 @@ void UniformsTab::edit_uniform(struct uniform_t* uniform) {
         case UNIFORM_TYPE_VALUE:
             {
                 ImGui::Text("TODO: Add adjustable min and max.");
-                ImGui::SliderFloat("##UNIFORM_VALUE", &uniform->values[0], -1.0, 1.0, "%f");
+                ImGui::SliderFloat("##UNIFORM_VALUE", &uniform->values[0], 0.0, 1.0, "%f");
             }
             break;
 

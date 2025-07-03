@@ -28,12 +28,13 @@ void SettingsTab::render(RMSB* rmsb) {
 
     ImGui::Separator();
 
-    if(ImGui::Button("Reload")) {
-        rmsb->reload_shader(USER_FALLBACK_OPTION);
+    if(ImGui::Button("Reload Shader")) {
+        rmsb->reload_shader();
     }
 
-    ImGui::SameLine();
-    ImGui::Checkbox("Fallback to working shader", &rmsb->fallback_user_shader);
+    if(ImGui::Button("Reload Lib")) {
+        rmsb->reload_lib();
+    }
 
     ImGui::Checkbox("Auto Reload", &rmsb->auto_reload);
     if(rmsb->auto_reload) {

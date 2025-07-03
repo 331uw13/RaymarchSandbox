@@ -40,13 +40,6 @@ enum Mode {
     EDIT_MODE
 };
 
-enum ReloadOption {
-    USER_FALLBACK_OPTION,
-    FALLBACK_TO_CURRENT,
-    NO_FALLBACK
-};
-
-
 struct texture_t {
     uint32_t id;
     int format;
@@ -100,8 +93,9 @@ class RMSB {
         struct texture_t create_empty_texture(int width, int height, int format);
 
         void render_shader();
-        void reload_shader(ReloadOption option);
-        bool fallback_user_shader;
+        void reload_shader();
+
+        void reload_lib();
 
         void loginfo(Color color, const char* text, ...);
         void render_infolog();
@@ -121,8 +115,10 @@ class RMSB {
 
         // On first load need to add the uniforms that are in.
         // @startup_command .... @end  region.
+        // TODO: Move these maybe somewhere else ???
         void run_shader_startup_cmd(const std::string* shader_code);
-        void proccess_shader_startup_cmd_line(const std::string* code_line);
+        void get_cmdline_value(const std::string& code_line, float values[4]);
+        void process_shader_startup_cmd_line(const std::string& code_line);
     
         // @startup_command  and @end are not valid glsl code.
         // they must be removed after reading.

@@ -90,6 +90,7 @@ void InternalLib::create_source() {
     std::string info_buf = "";
     struct u8col_t document_color = UCOLOR_INFO;
 
+    this->lines = 0;
 
     while(std::getline(file, line)) {
        
@@ -152,11 +153,9 @@ void InternalLib::create_source() {
         }
 
 
+        this->lines++;
         this->source += line + '\n';
     }
-
-    printf("-----------------------------\n%s\n------------------------------\n",
-            this->source.c_str());
 
     /*
     this->source += "layout (local_size_x = 1, local_size_y = 1) in;\n";
@@ -585,11 +584,14 @@ void InternalLib::add_uniform(struct uniform_t* u) {
         return;
     }
 
-
     this->source.insert(found_index, get_uniform_code_line(u));
-
 }
 
+
+void InternalLib::clear() {
+    this->source.clear();
+    this->documents.clear();
+}
 
 
 

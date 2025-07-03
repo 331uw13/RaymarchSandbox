@@ -80,10 +80,13 @@ class InternalLib {
         std::list<struct document_t> documents;
         std::list<struct uniform_t> uniforms;
 
+        void clear();
+
         // Avoid accidental copies.
         InternalLib(InternalLib const&) = delete;
         void operator=(InternalLib const&) = delete;
 
+        size_t lines;
 
     private:
 

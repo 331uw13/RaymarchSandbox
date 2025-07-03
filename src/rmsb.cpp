@@ -80,7 +80,6 @@ void RMSB::init() {
         m_infolog[i].enabled = 0;
     }
 
-    this->fallback_user_shader = true;
     this->auto_reload = false;
     this->auto_reload_delay = 3.0;
     this->input_key = 0;
@@ -306,17 +305,59 @@ void RMSB::render_shader() {
     DrawRectangle(0, 0, this->monitor_width, this->monitor_height, RED);
     EndShaderMode();
 }
+
+void RMSB::get_cmdline_value(const std::string& code_line, float values[4]) {
     
+    size_t array_start = code_line.find("(");
+    size_t array_end = code_line.find(")");
 
-void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
-
-    if(code_line->empty()) {
+    if((array_start == std::string::npos)
+    || (array_end == std::string::npos)) {
         return;
     }
 
-    if(!code_line->find("ADD:")) {
+
+    char buf[64] = { 0 };
+    size_t buf_i = 0;
+    size_t values_i = 0;
+    printf("\n");
+
+    for(size_t i = array_start+1; i < array_end+1; i++) {
+        char c = code_line[i];
+      
+        if((c == ',') || (c == ')')) {
+            // The value is written to buf,
+            // convert to float and move it to values array.
+            values[values_i] = atof(buf);
+            memset(buf, 0, buf_i);
+            buf_i = 0;
+            values_i++;
+
+            continue;
+        } 
+        
+        if((c >= '0' && c <= '9') || (c == '.')) {
+            buf[buf_i] = c;
+            buf_i++;
+            if(buf_i >= 64) {
+                fprintf(stderr, "'%s': Invalid array for '%s'\n",
+                        __func__, code_line.c_str());
+                return;
+            }
+        }
+       
+    }
+}
+
+void RMSB::process_shader_startup_cmd_line(const std::string& code_line) {
+
+    if(code_line.empty()) {
+        return;
+    }
+
+    if(!code_line.find("ADD:")) {
         fprintf(stderr, "'%s': \"%s\" not valid startup command.\n",
-                __func__, code_line->c_str());
+                __func__, code_line.c_str());
         return;
     }
 
@@ -329,8 +370,8 @@ void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
 
     // Read into 'parts'
     // and when <space char> is found. move it into args[num_args].
-    for(size_t i = 0; i < code_line->size(); i++) {
-        char c = (*code_line)[i];
+    for(size_t i = 0; i < code_line.size(); i++) {
+        char c = code_line[i];
 
         bool line_end = (c == ';');
 
@@ -355,9 +396,11 @@ void RMSB::proccess_shader_startup_cmd_line(const std::string* code_line) {
     struct uniform_t uniform = {
         .type = -1,
         .location = 0,
-        .values = { 0.99, 0.56, 0.5, 1.0 },
+        .values = { 0.0, 0.0, 0.0, 0.0 },
         .name = *name
     };
+
+    get_cmdline_value(code_line, uniform.values);
 
     if(*type == "COLOR") {
         uniform.type = UNIFORM_TYPE_COLOR;
@@ -392,7 +435,7 @@ void RMSB::run_shader_startup_cmd(const std::string* shader_code) {
         char c = (*shader_code)[i];
         if(c == '\n') {
             
-            proccess_shader_startup_cmd_line(&line);
+            process_shader_startup_cmd_line(line);
 
             line.clear();
             continue;
@@ -400,8 +443,6 @@ void RMSB::run_shader_startup_cmd(const std::string* shader_code) {
 
         line += c;
     }
-
-
 }
 
 void RMSB::remove_startup_cmd_blocks(std::string* shader_code) {
@@ -422,16 +463,7 @@ void RMSB::remove_startup_cmd_blocks(std::string* shader_code) {
 
 
 
-void RMSB::reload_shader(ReloadOption option) {
- 
-    if(option == USER_FALLBACK_OPTION) {
-        if(this->fallback_user_shader) {
-            option = FALLBACK_TO_CURRENT;
-        }
-        else {
-            option = NO_FALLBACK;
-        }
-    }
+void RMSB::reload_shader() {
 
     // Reset shader uniform locations.
     // New ones may be added or they maybe have changed.
@@ -459,34 +491,11 @@ void RMSB::reload_shader(ReloadOption option) {
     code += shader_code;
     code.push_back('\0');
 
-    printf("TODO: Add back the fallback options.\n");
 
     if(this->compute_shader > 0) {
         glDeleteProgram(this->compute_shader);
     }
     this->compute_shader = load_compute_shader(code.c_str());
-
-    /*
-    if(option == NO_FALLBACK) {
-        if(this->shader.id > 0) {
-            unload_shader(&this->shader);
-        }
-        this->shader = load_shader_from_mem(VERTEX_SHADER_CODE, code.c_str());
-        this->shader_loaded = (this->shader.id > 0);
-    }
-    else
-    if(option == FALLBACK_TO_CURRENT) {
-        Shader tmp_shader = load_shader_from_mem(VERTEX_SHADER_CODE, code.c_str());
-        if(tmp_shader.id > 0) {
-            unload_shader(&this->shader);
-            this->shader = tmp_shader;
-            this->shader_loaded = true;
-        }
-        else {
-            unload_shader(&tmp_shader);
-        }
-    }
-    */
 
     // Tell user what happened.
     if(this->compute_shader > 0) {
@@ -502,6 +511,17 @@ void RMSB::reload_shader(ReloadOption option) {
     
     m_first_shader_load = false;
 }
+        
+
+void RMSB::reload_lib() {
+    InternalLib& ilib = InternalLib::get_instance();
+    ilib.clear();
+    ilib.create_source();
+    m_first_shader_load = true;
+    reload_shader();
+    loginfo(PURPLE, "Internal library reloaded");
+}
+
 
 void RMSB::loginfo(Color color, const char* text, ...) {
 #define LOGINFO_BUF_SIZE 64

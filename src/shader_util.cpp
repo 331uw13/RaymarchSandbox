@@ -44,7 +44,7 @@ unsigned int compile_shader(const char* shader_code, int shader_type) {
      
             glGetShaderInfoLog(shader, log_max_len, &log_len, log);
     
-            printf("%s: %s\n", __func__, log);
+            //printf("%s: %s\n", __func__, log);
             ErrorLog::get_instance().add(log);
             free(log);
         }
@@ -206,7 +206,6 @@ uint32_t load_compute_shader(const char* code) {
 
     uint32_t shader = compile_shader(code, GL_COMPUTE_SHADER);
     if(shader == 0) {
-        printf("fuck.\n");
         glDeleteProgram(program);
         program = 0;
         goto error;
@@ -255,8 +254,6 @@ bool is_uniform_name_valid(const char* name, size_t name_size) {
         }
 
         // Dont allow any special characters.
-        // Some of them are located between non-special characters 
-        // so they have to be checked too.
         if((c < 0x30) || (c > 0x7A)) {
             goto not_valid;
         }

@@ -53,7 +53,7 @@ void InputHandler::handle_all_mode(RMSB* rmsb) {
             break;
 
         case KEY_R:
-            rmsb->reload_shader(USER_FALLBACK_OPTION);
+            rmsb->reload_shader();
             break;
 
 
