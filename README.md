@@ -12,8 +12,6 @@
  References for raymarching from iq: https://iquilezles.org/articles/
 
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-2.png?raw=true)
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-3.png?raw=true)
 
 ### (screenshots are not updated)
 
