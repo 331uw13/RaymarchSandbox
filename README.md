@@ -12,7 +12,6 @@
  References for raymarching from iq: https://iquilezles.org/articles/
 
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-01.png?raw=true)
 
 -------------------------------------------------
 
@@ -29,6 +28,12 @@ make
 
 -------------------------------------------------
 ## Recent Updates
+
+* Tue Jul 8 2025
+```
+- Added translucent material property.
+- Small improvements
+```
 
 * Thu Jul 3 2025
 ```
