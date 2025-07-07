@@ -763,9 +763,9 @@ void Editor::move_cursor_to(int64_t x, int64_t y) {
     int64_t x_diff = (x - cursor.x);
 
     if(
-    (y >= max_vrow) /* Scroll up */
+    (y >= max_vrow) /* Scroll down */
      ||
-    ((y < m_scroll) && (m_scroll > 0))) /* Scroll down */
+    ((y < m_scroll) && (m_scroll > 0))) /* Scroll up */
     {
         m_scroll += y_diff;
         if(m_scroll < 0) {
@@ -1129,6 +1129,9 @@ void Editor::init_syntax_colors() {
     m_color_map["Mspecular"] = INTERNAL;
     m_color_map["Mdistance"] = INTERNAL;
     m_color_map["Mshine"] = INTERNAL;
+    m_color_map["MreflectN"] = INTERNAL;
+    m_color_map["Mopaque"] = INTERNAL;
+
     m_color_map["ColorRGB"] = INTERNAL;
     m_color_map["Ray"] = GLOBAL;
     m_color_map["CameraInputRotation"] = INTERNAL;

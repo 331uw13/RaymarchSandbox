@@ -24,29 +24,13 @@ uniform vec3 CameraInputPosition;
 
 
 
-#define Material mat3x3
-#define Mdiffuse(x)  x[0]
-#define Mspecular(x) x[1]
-#define Mdistance(x) x[2][0]
-#define MreflectN(x) x[2][2]
-
-
-/* -INFO
-Raymarch function will set these variables.
-RAY_T Ray;
-*/
-struct RAY_T
-{
-    int   hit;
-    vec3  pos;
-    float len;
-    Material mat;
-    Material closest_mat;
-    float reflect_len;
-    Material reflectoff_mat;
-};
-RAY_T Ray;
-
+#define Material mat4x3
+#define Mdiffuse(x)     x[0]
+#define Mspecular(x)    x[1]
+#define Mdistance(x)    x[2][0]
+#define MreflectN(x)    x[2][1]
+#define Mopaque(x)      x[2][2]
+#define Mcanglow(x)     x[3][0]
 
 /* -INFO
 User must define this function.
@@ -56,11 +40,72 @@ FUNC Material map(vec3 p);
 FUNC_END
 
 
+
+
+/* -INFO
+TODO: Add more info
+
+User must define this function for colorize transparent materials.
+Notes/Tips:
+   - Ray.mat      : what material is being processed.
+   - Ray.vm_len   : distance enter point to exit point.
+
+*/
+FUNC void vm_map();
+FUNC_END
+
+
+
+
+/* -INFO
+Raymarch function will set these variables.
+RAY_T Ray;
+*/
+struct RAY_T
+{
+    vec3  volume_color;
+
+    int   hit;
+    vec3  pos;
+    float len;    // Ray length to first ray hit (reflection doesnt use this.)
+    float vm_len; // Distance from enter point to exit point.
+
+    Material mat; // Material which ray hit.
+    Material closest_mat; // Closest material to ray.
+
+    float reflect_len; // Ray length after hit to reflective material.
+    Material reflectoff_mat;
+};
+RAY_T Ray;
+
+
+/* -INFO
+Material should be initialized correctly.
+*/
+FUNC Material EmptyMaterial()
+{
+    return Material(
+            vec3(0.5, 0.5, 0.5), // Default diffuse color.
+            vec3(0.2, 0.2, 0.2), // Default specular color.
+            vec3(
+                MAX_RAY_LENGTH+1.0,
+                0, // Non-reflective by default.
+                1  // Opaque by default.
+                ),
+            vec3(
+                0,
+                0,
+                0
+                ));
+}
+FUNC_END
+
 /* -INFO
 Set color for the current pixel.
 */
 FUNC void SetPixel(vec3 color)
 {
+    color += Ray.volume_color;
     imageStore(output_img, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 }
 FUNC_END
@@ -117,27 +162,6 @@ FUNC vec3 Raydir()
 FUNC_END
 
 
-// "private" function.
-void _Iraymarch_reflect(vec3 ro, vec3 rd)
-{
-    Ray.reflect_len = 0.0;
-    Ray.pos = ro;
-
-    while(Ray.reflect_len < MAX_RAY_LENGTH) {
-        Ray.pos = ro + rd * Ray.reflect_len;
-
-        Material c = map(Ray.pos);
-        if(Mdistance(c) <= HIT_DISTANCE) {
-            vec3 diffuse = mix(Mdiffuse(Ray.mat), Mdiffuse(c), 0.5);
-            Ray.mat = c;
-            Mdiffuse(Ray.mat) = diffuse;
-            break;
-        }
-
-        Ray.reflect_len += Mdistance(c);
-    }
-}
-
 /* -INFO
 This function will return surface normal for given point 'p'
 by sampling the same point buf slightly different offsets.
@@ -154,6 +178,91 @@ FUNC vec3 ComputeNormal(vec3 p)
 FUNC_END
 
 
+int _FLAG_reflect = 0;
+
+/* -INFO
+*/
+FUNC void Raymarch_I(vec3 ro, vec3 rd)
+{    
+    Ray.hit = 0;
+    Ray.len = 0.0;
+    Ray.vm_len = 0.0;
+    Ray.pos = ro;
+    Ray.mat = Material(0);
+    
+    int ray_outside = 1;
+
+    while(Ray.len < MAX_RAY_LENGTH) {
+        if(ray_outside == 1) {
+            Ray.pos = ro + rd * Ray.len;
+            Material c = map(Ray.pos);
+            if((Mcanglow(c) >= 1)
+            && (Mdistance(c) < Mdistance(Ray.closest_mat))) {
+                Ray.closest_mat = c;
+            }
+            if(Mdistance(c) <= HIT_DISTANCE) {
+                Ray.hit = 1;
+                Ray.mat = c;
+
+                if(MreflectN(c) > 0.0) {
+                    _FLAG_reflect = 1;
+                    break;
+                }
+                else
+                if(Mopaque(c) < 1.0) {
+                    Ray.mat = c;
+                    ray_outside = 0;
+                }
+                else {
+                    break;
+                }
+            }
+
+            Ray.len += Mdistance(c);
+        }
+        else {
+            Ray.pos = ro + rd * (Ray.len + Ray.vm_len);
+
+            Material c = map(Ray.pos);
+            if(Mdistance(c) >= HIT_DISTANCE+0.01) {
+                vm_map();
+                Ray.mat = c;
+                Ray.len += Ray.vm_len;
+                ray_outside = 1;
+            }
+            Ray.vm_len += 0.1;
+        }       
+    }
+}
+FUNC_END
+
+/* -INFO
+   test
+*/
+FUNC void Raymarch(vec3 ro, vec3 rd)
+{
+    _FLAG_reflect = 0;
+    Ray.closest_mat = EmptyMaterial();
+    Raymarch_I(ro, rd);
+    
+    if(_FLAG_reflect == 1) {
+        Ray.reflect_len = 0.0;
+        vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
+        vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
+        
+        float rl = Ray.len;
+        Ray.reflectoff_mat = Ray.mat;
+        Raymarch_I(new_ro, new_rd);
+
+        if(Ray.hit == 1) {
+            Mdiffuse(Ray.mat) = mix(Mdiffuse(Ray.reflectoff_mat), Mdiffuse(Ray.mat), 0.5);
+        }
+        Ray.reflect_len = Ray.len;
+        Ray.len = rl;
+    }
+}
+FUNC_END
+
 
 /* -INFO
 Results can be accessed from Ray (RAY_T) struct.
@@ -162,38 +271,63 @@ Results can be accessed from Ray (RAY_T) struct.
    - rd must be normalized.
    - user must define the map function.
 */
-FUNC void Raymarch(vec3 ro, vec3 rd)
+/*
+FUNC void Raymarch_DISABLED(vec3 ro, vec3 rd)
 {
     Ray.hit = 0;
     Ray.len = 0.0;
+    Ray.vm_len = 0.0;
     Ray.pos = ro;
     Ray.closest_mat = Material(0);
     Ray.reflectoff_mat = Material(0);
     Ray.mat = Material(0);
-        
+    
+    int ray_outside = 1;
+
     while(Ray.len < MAX_RAY_LENGTH) {
-        Ray.pos = ro + rd * Ray.len;
 
-        Material c = map(Ray.pos);
-        if(Mdistance(c) <= HIT_DISTANCE) {
-            Ray.hit = 1;
-            Ray.mat = c;
+        if(ray_outside == 1) {
+            Ray.pos = ro + rd * Ray.len;
+            Material c = map(Ray.pos);
+            if(Mdistance(c) <= HIT_DISTANCE) {
+                Ray.hit = 1;
+                Ray.mat = c;
 
-            int num_r = int(round(MreflectN(c)));
-            if(num_r > 0) {
-                Ray.reflectoff_mat = Ray.mat;
-                vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
-                vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
-                _Iraymarch_reflect(new_ro, new_rd);
+                if(MreflectN(c) > 0.0) {
+                    Ray.reflectoff_mat = Ray.mat;
+                    vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
+                    vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
+                    _Iraymarch_reflect(new_ro, new_rd);
+                    break;
+                }
+                else
+                if(Mopaque(c) < 1.0) {
+                    Ray.mat = c;
+                    ray_outside = 0;
+                }
+                else {
+                    break;
+                }
             }
 
-            break;
+            Ray.len += Mdistance(c);
         }
+        else {
+            Ray.pos = ro + rd * (Ray.len + Ray.vm_len);
 
-        Ray.len += Mdistance(c);
+            Material c = map(Ray.pos);
+            if(Mdistance(c) >= HIT_DISTANCE+0.01) {
+                vm_map();
+                Ray.mat = c;
+                Ray.len += Ray.vm_len;
+                ray_outside = 1;
+            }
+            Ray.vm_len += 0.1;
+        }
     }
 }
 FUNC_END
+*/
 
 /* -INFO
 Returns material which distance is smaller.

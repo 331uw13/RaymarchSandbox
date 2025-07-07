@@ -1,6 +1,7 @@
 
 #include <vector>
 #include <string_view>
+#include <cstring>
 
 #include "preproc.hpp"
 
@@ -54,6 +55,10 @@ static bool compare(
         const char* str_A, size_t size_A,
         const char* str_B, size_t size_B
 ){
+    if(size_B == 0) {
+        size_B = strlen(str_B);
+    }
+
     bool result = false;
     if(size_A != size_B) {
         goto skip;
@@ -81,9 +86,11 @@ void Preproc::process_glsl(std::string* shader_code, std::string* outdef) {
     //
 
     for(size_t i = 0; i < include_tags.size(); i++) {
-        struct tag_t* tag = &include_tags[i];
+        const struct tag_t* tag = &include_tags[i];
     
-
+        if(compare(tag->pstr, tag->size, "RM_VOLUME_MAP", 0)) {
+            *outdef += "\n#define VMAP_ENABLED 1\n";
+        }
         
 
         shader_code->erase(tag->index, tag->end - tag->index);

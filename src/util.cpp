@@ -14,8 +14,6 @@ void set_startupcmd_values(std::string& shader_code, const char* name, const flo
     size_t begin_index = shader_code.find(STARTUP_CMD_BEGIN_TAG);
     size_t end_index = shader_code.find(STARTUP_CMD_END_TAG);
 
-    printf("%s\n", shader_code.c_str());
-
     if((begin_index == std::string::npos) || (end_index == std::string::npos)) {
         printf("'%s': No valid startup command region found.\n", __func__);
         return;

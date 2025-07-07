@@ -320,7 +320,7 @@ void RMSB::get_cmdline_value(const std::string& code_line, float values[4]) {
     char buf[64] = { 0 };
     size_t buf_i = 0;
     size_t values_i = 0;
-    printf("\n");
+    //printf("\n");
 
     for(size_t i = array_start+1; i < array_end+1; i++) {
         char c = code_line[i];
