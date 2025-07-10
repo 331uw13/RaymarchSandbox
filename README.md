@@ -2,6 +2,10 @@
 
 #### Made with raylib (https://github.com/raysan5/raylib)  and imgui (https://github.com/ocornut/imgui)
 
+ References for raymarching from iq: https://iquilezles.org/articles/
+ 
+-----------------------------------
+
 ## Features
 * Built-in functions for raymarching.
 * Text editor with GLSL syntax highlight.
@@ -9,14 +13,7 @@
 * First person camera support.
 -----------------------------------
 
- References for raymarching from iq: https://iquilezles.org/articles/
 
-
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-02.png?raw=true)
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-03.png?raw=true)
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-04.png?raw=true)
-
--------------------------------------------------
 
 
 ## Building instructions.
@@ -29,8 +26,22 @@ make
 ./rmsb examples/intro.glsl
 ```
 
--------------------------------------------------
+-----------------------------------
+
+
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-02.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-03.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-04.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox-05.png?raw=true)
+
 ## Recent Updates
+
+* Thu Jul 10 2025
+```
+- Created more examples and intro.glsl
+- Updated internal.glsl
+- Fixed few bugs
+```
 
 * Tue Jul 8 2025
 ```
@@ -51,23 +62,5 @@ make
 - Internal library is now read from `internal.glsl` file
 - Added reflection option "MreflectN" for material.
 ```
-
-* Thu Jun 26 2025
-```
-- Added copy and cut of selected text functionality to GLSL editor.
-- Fixed editor focus issue
-```
-
-* Mon Jun 23 2025
-```
-- "Quit" button will now ask to save the shader before quitting if necessary
-- Added noise functions to internal lib.
-- Small improvements
-```
-
-
-
-
-
 
 
