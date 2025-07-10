@@ -65,8 +65,12 @@ void SettingsTab::render(RMSB* rmsb) {
                 &rmsb->max_ray_len, 10.0, 3000.0,
                 "Max ray length: %0.2f");
 
+        ImGui::SliderFloat("##TRANSLUCENT_STEP_SIZE",
+                &rmsb->translucent_step_size, 0.001, 0.2,
+                "Translucent Step: %f");
+
         if(ImGui::SliderInt("##FPS_LIMIT",
-                &rmsb->fps_limit, 10, 1000,
+                &rmsb->fps_limit, 30, 1000,
                 "FPS Limit: %i")) {
             SetTargetFPS(rmsb->fps_limit);
         }
@@ -97,6 +101,13 @@ void SettingsTab::render(RMSB* rmsb) {
     }
 
     if(ImGui::CollapsingHeader("Camera Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+        
+        ImGui::TextColored(ImVec4(1.0, 0.3, 0.3, 1.0), "X:%0.3f ", rmsb->camera.pos.x);
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.3, 1.0, 0.3, 1.0), "Y:%0.3f ", rmsb->camera.pos.y);
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.4, 0.4, 1.0, 1.0), "Z:%0.3f ", rmsb->camera.pos.z);
+
         ImGui::SliderFloat("##CAMERA_SENSETIVITY",
                 &rmsb->camera.sensetivity, 0.001, 1.0,
                 "Sensetivity: %0.3f");

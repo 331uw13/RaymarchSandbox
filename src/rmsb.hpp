@@ -78,7 +78,8 @@ class RMSB {
         float fov;
         float hit_distance;
         float max_ray_len;
-
+        float translucent_step_size;
+            
         int monitor_width;
         int monitor_height;
 

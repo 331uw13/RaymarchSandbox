@@ -84,11 +84,11 @@ void RMSBGui::update() {
     Editor& editor = Editor::get_instance();
 
 
-    if(input_char != 0) {
+    if((input_char != 0) && !editor.has_focus) {
         io.AddInputCharacter(input_char);
     }
 
-    if(editor.mouse_hovered) { 
+    if(editor.mouse_hovered && editor.open) { 
         io.MousePos = ImVec2(GetScreenWidth()/2, GetScreenHeight()/2);
         return;
     }
@@ -155,25 +155,6 @@ void RMSBGui::render(RMSB* rmsb) {
                 }
                 ImGui::EndTabBar();
             }
-       
-            /*
-            ImGui::SeparatorText("Compile settings");
-            // TODO: Auto compile.
-            
-            ImGui::SeparatorText("Custom uniforms");
-            // TODO: Easily programmable timelines.
-            
-            ImGui::SeparatorText("Textures");
-            // TODO: Easily programmable timelines.
-            
-            ImGui::SeparatorText("Camera settings");
-            // TODO: 3D view toggle.
-
-            ImGui::SeparatorText("Timeline settings");
-            // TODO: Easily programmable timelines.
-            */
-
-
         }
         ImGui::End();
     }

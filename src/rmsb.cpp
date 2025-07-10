@@ -80,6 +80,7 @@ void RMSB::init() {
         m_infolog[i].enabled = 0;
     }
 
+    this->translucent_step_size = 0.1;
     this->auto_reload = false;
     this->auto_reload_delay = 3.0;
     this->input_key = 0;
@@ -94,7 +95,7 @@ void RMSB::init() {
     this->show_fps = true;
     this->fov = 60.0;
     this->hit_distance = 0.001000;
-    this->max_ray_len = 500.0;
+    this->max_ray_len = 1000.0;
     this->allow_camera_input = false; 
     this->camera = (struct camera_t) {
         .pos = (Vector3){ 0, 0, 0 },
@@ -278,8 +279,8 @@ void RMSB::render_shader() {
     shader_uniform_vec3(compute_shader, "CameraInputPosition", this->camera.pos);
     shader_uniform_float(compute_shader, "CAMERA_INPUT_YAW", this->camera.yaw);
     shader_uniform_float(compute_shader, "CAMERA_INPUT_PITCH", this->camera.pitch);
-
-
+    shader_uniform_float(compute_shader, "TRANSLUCENT_STEP_SIZE", this->translucent_step_size);
+    
     glUseProgram(this->compute_shader);
 	glBindImageTexture(
             8, // Binding point.
