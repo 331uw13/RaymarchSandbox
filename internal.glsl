@@ -11,6 +11,7 @@ uniform float time;
 uniform float FOV;
 uniform float HIT_DISTANCE;
 uniform float MAX_RAY_LENGTH;
+uniform float TRANSLUCENT_STEP_SIZE;
 uniform float CAMERA_INPUT_YAW;
 uniform float CAMERA_INPUT_PITCH;
 uniform vec3 CameraInputPosition;
@@ -179,8 +180,43 @@ FUNC_END
 
 
 int _FLAG_reflect = 0;
+void Raymarch_I(vec3 ro, vec3 rd);
 
 /* -INFO
+Results can be accessed from Ray (RAY_T) struct.
+   - ro is the ray origin position.
+   - rd is the ray direction.
+   - rd must be normalized.
+   - user must define the map function.
+*/
+FUNC void Raymarch(vec3 ro, vec3 rd)
+{
+    _FLAG_reflect = 0;
+    Ray.closest_mat = EmptyMaterial();
+    Ray.volume_color = vec3(0);
+    Raymarch_I(ro, rd);
+    
+    if(_FLAG_reflect == 1) {
+        Ray.reflect_len = 0.0;
+        vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
+        vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
+        
+        float rl = Ray.len;
+        Ray.reflectoff_mat = Ray.mat;
+        Raymarch_I(new_ro, new_rd);
+
+        if(Ray.hit == 1) {
+            Mdiffuse(Ray.mat) = mix(Mdiffuse(Ray.reflectoff_mat), Mdiffuse(Ray.mat), 0.5);
+        }
+        Ray.reflect_len = Ray.len;
+        Ray.len = rl;
+    }
+}
+FUNC_END
+
+/* -INFO
+Reflections are not handled by this function.
+Use Raymarch(...) instead.
 */
 FUNC void Raymarch_I(vec3 ro, vec3 rd)
 {    
@@ -230,104 +266,13 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
                 Ray.len += Ray.vm_len;
                 ray_outside = 1;
             }
-            Ray.vm_len += 0.1;
+            Ray.vm_len += TRANSLUCENT_STEP_SIZE;
         }       
     }
 }
 FUNC_END
 
-/* -INFO
-   test
-*/
-FUNC void Raymarch(vec3 ro, vec3 rd)
-{
-    _FLAG_reflect = 0;
-    Ray.closest_mat = EmptyMaterial();
-    Raymarch_I(ro, rd);
-    
-    if(_FLAG_reflect == 1) {
-        Ray.reflect_len = 0.0;
-        vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
-        vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
-        
-        float rl = Ray.len;
-        Ray.reflectoff_mat = Ray.mat;
-        Raymarch_I(new_ro, new_rd);
 
-        if(Ray.hit == 1) {
-            Mdiffuse(Ray.mat) = mix(Mdiffuse(Ray.reflectoff_mat), Mdiffuse(Ray.mat), 0.5);
-        }
-        Ray.reflect_len = Ray.len;
-        Ray.len = rl;
-    }
-}
-FUNC_END
-
-
-/* -INFO
-Results can be accessed from Ray (RAY_T) struct.
-   - ro is the ray origin position.
-   - rd is the ray direction.
-   - rd must be normalized.
-   - user must define the map function.
-*/
-/*
-FUNC void Raymarch_DISABLED(vec3 ro, vec3 rd)
-{
-    Ray.hit = 0;
-    Ray.len = 0.0;
-    Ray.vm_len = 0.0;
-    Ray.pos = ro;
-    Ray.closest_mat = Material(0);
-    Ray.reflectoff_mat = Material(0);
-    Ray.mat = Material(0);
-    
-    int ray_outside = 1;
-
-    while(Ray.len < MAX_RAY_LENGTH) {
-
-        if(ray_outside == 1) {
-            Ray.pos = ro + rd * Ray.len;
-            Material c = map(Ray.pos);
-            if(Mdistance(c) <= HIT_DISTANCE) {
-                Ray.hit = 1;
-                Ray.mat = c;
-
-                if(MreflectN(c) > 0.0) {
-                    Ray.reflectoff_mat = Ray.mat;
-                    vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
-                    vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
-                    _Iraymarch_reflect(new_ro, new_rd);
-                    break;
-                }
-                else
-                if(Mopaque(c) < 1.0) {
-                    Ray.mat = c;
-                    ray_outside = 0;
-                }
-                else {
-                    break;
-                }
-            }
-
-            Ray.len += Mdistance(c);
-        }
-        else {
-            Ray.pos = ro + rd * (Ray.len + Ray.vm_len);
-
-            Material c = map(Ray.pos);
-            if(Mdistance(c) >= HIT_DISTANCE+0.01) {
-                vm_map();
-                Ray.mat = c;
-                Ray.len += Ray.vm_len;
-                ray_outside = 1;
-            }
-            Ray.vm_len += 0.1;
-        }
-    }
-}
-FUNC_END
-*/
 
 /* -INFO
 Returns material which distance is smaller.
@@ -353,7 +298,7 @@ Mix two materials.
 */
 FUNC Material MixMaterial(Material a, Material b, float t)
 {
-    Material m = Material(0);
+    Material m = EmptyMaterial();
     Mdiffuse(m) = mix(Mdiffuse(a), Mdiffuse(b), t);
     Mspecular(m) = mix(Mspecular(a), Mspecular(b), t);
     Mdistance(m) = mix(Mdistance(a), Mdistance(b), t);
@@ -384,7 +329,7 @@ Calculate light values for the material 'm'
 */
 FUNC vec3 LightDirectional(vec3 eye, vec3 direction, vec3 color, vec3 normal, Material m)
 {
-    
+    direction = -direction;
     vec3 view_dir = normalize(eye - Ray.pos);
     vec3 halfway_dir = normalize(direction - view_dir);
 
@@ -439,10 +384,13 @@ FUNC vec3 Palette(float t, vec3 a, vec3 b, vec3 c, vec3 d)
 FUNC_END
 
 /* -INFO
-https://iquilezles.org/articles/fog/
+Based on: https://iquilezles.org/articles/fog/
+TODO: Clean this up.
+
 */
-FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color)
+FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color, float e)
 {
+    float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
     if(MreflectN(Ray.reflectoff_mat) > 0) { /* Shape is reflective */
 
         // Fog has to be applied to the reflection ray
@@ -454,15 +402,22 @@ FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color)
         
         vec3 color = mix(current_color, fog_color_refl, fog_amount_refl);
 
-        float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
-        return mix(color, fog_color, fog_amount);
+        return mix(color, fog_color, pow(fog_amount, e));
     }
     else { /* Non-reflective */
-        float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
-        return mix(current_color, fog_color, fog_amount);
+        return mix(current_color, fog_color, pow(fog_amount, e));
     }
 
     return current_color;
+}
+FUNC_END
+
+/* -INFO
+Map value t from src range to dst range.
+*/
+FUNC float MapValue(float t, float src_min, float src_max, float dst_min, float dst_max)
+{
+    return (t - src_min) * (dst_max - dst_min) / (src_max - src_min) + dst_min;
 }
 FUNC_END
 
@@ -556,7 +511,50 @@ FUNC vec3 RepeatLIM(vec3 p, vec3 s, vec3 lim)
 FUNC_END
 
 
+vec2 _fade(vec2 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
+vec4 _permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+
+/* -INFO
+2D Perlin noise by Stefan Gustavson (https://github.com/stegu/webgl-noise)
+*/
+FUNC float PerlinNoise2D(vec2 P)
+{
+  vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
+  vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
+  Pi = mod(Pi, 289.0); // To avoid truncation effects in permutation
+  vec4 ix = Pi.xzxz;
+  vec4 iy = Pi.yyww;
+  vec4 fx = Pf.xzxz;
+  vec4 fy = Pf.yyww;
+  vec4 i = _permute(_permute(ix) + iy);
+  vec4 gx = 2.0 * fract(i * 0.0243902439) - 1.0; // 1/41 = 0.024...
+  vec4 gy = abs(gx) - 0.5;
+  vec4 tx = floor(gx + 0.5);
+  gx = gx - tx;
+  vec2 g00 = vec2(gx.x,gy.x);
+  vec2 g10 = vec2(gx.y,gy.y);
+  vec2 g01 = vec2(gx.z,gy.z);
+  vec2 g11 = vec2(gx.w,gy.w);
+  vec4 norm = 1.79284291400159 - 0.85373472095314 *
+    vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
+  g00 *= norm.x;
+  g01 *= norm.y;
+  g10 *= norm.z;
+  g11 *= norm.w;
+  float n00 = dot(g00, vec2(fx.x, fy.x));
+  float n10 = dot(g10, vec2(fx.y, fy.y));
+  float n01 = dot(g01, vec2(fx.z, fy.z));
+  float n11 = dot(g11, vec2(fx.w, fy.w));
+  vec2 fade_xy = _fade(Pf.xy);
+  vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
+  float n_xy = mix(n_x.x, n_x.y, fade_xy.y);
+  return 2.3 * n_xy;
+}
+FUNC_END
+
+
 // ----- Signed Distance Functions -----
+
 
 /* -INFO
 https://iquilezles.org/articles/distfunctions/
