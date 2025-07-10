@@ -12,6 +12,7 @@
     
     - (Left Control + E): Hide/Show Editor.
     - (Left Control + F): Hide/Show Settings & Functions.
+    - (Left Control + A): Hide/Show Gui.
     
     - Added uniforms from "Uniform Input" tab
       are available in the code with the same name
@@ -132,7 +133,7 @@ void main() {
         
     }
     
-    out_color = ApplyFog(out_color, 1.0, fog_color.rgb);
+    out_color = ApplyFog(out_color, 1.0, fog_color.rgb, 1);
     
     // Add littlebit of glow to glowing materials.
     float glow = clamp(Mdistance(Ray.closest_mat), 0, 1);
