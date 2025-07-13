@@ -36,6 +36,11 @@ make
 
 ## Recent Updates
 
+* Sun Jul 13 2025
+```
+- Started to implement undo for editor
+```
+
 * Thu Jul 10 2025
 ```
 - Created more examples and intro.glsl
