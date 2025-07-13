@@ -39,6 +39,7 @@ void InputHandler::handle_all_mode(RMSB* rmsb) {
             }
             break;
 
+
         case KEY_E:
             editor.open = !editor.open;
             break;
@@ -87,14 +88,27 @@ void InputHandler::handle_edit_mode(RMSB* rmsb) {
     if(key == 0) {
         return;
     }
+    
+    Editor& editor = Editor::get_instance();
+
+    if(IsKeyPressed(KEY_ESCAPE)) {
+        editor.unselect();
+    }
 
     if(!IsKeyDown(KEY_LEFT_CONTROL)) {
         return;
     }
 
-    if(IsKeyPressed(KEY_S)) {
-        Editor::get_instance().save(rmsb->shader_filepath);
-        rmsb->loginfo(GREEN, TextFormat("Shader Saved (%s)", rmsb->shader_filepath.c_str()));
+
+    switch(key) {
+        case KEY_S:
+            editor.save(rmsb->shader_filepath);
+            rmsb->loginfo(GREEN, TextFormat("Shader Saved (%s)", rmsb->shader_filepath.c_str()));
+            break;
+
+        case KEY_Z:
+            editor.undo();
+            break;
     }
 }
 

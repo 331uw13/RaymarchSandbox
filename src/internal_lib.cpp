@@ -77,6 +77,7 @@ void InternalLib::create_source() {
             "(float) |  Mdistance(m) = <SDF Function result>\n"
             "(float) |  MreflectN(m) = <0 = non-reflective(default),  1 = reflective>\n"
             "(float) |  Mopaque(m)   = <0.0 = fully opaque(default),  0.0 - 1.0 = transparent>\n"
+            "(float) |  Mcanglow(m)  = when set to 1.0 or above the material will contribute to Ray.closest_mat\n"
             ,
             UCOLOR_INFO);
 

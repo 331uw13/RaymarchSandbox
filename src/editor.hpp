@@ -7,6 +7,10 @@
 #include <cstdint>
 #include <map>
 
+
+#include "editor_undo.hpp"
+
+
 // Very basic text editor for editting GLSL code.
 
 /*
@@ -20,13 +24,25 @@
 
 class RMSB;
 
+struct Cursor {
+    int64_t x;
+    int64_t y;
+};
+
+#define ASCII_MAX 127
+
+
 class Editor {
     public:
         static Editor& get_instance() {
             static Editor i;
             return i;
         }
+        
+        Editor(Editor const&) = delete;
+        void operator=(Editor const&) = delete;
 
+        
         std::string title;
 
         void init();
@@ -38,12 +54,12 @@ class Editor {
         bool open;
         char char_input;
 
-        Editor(Editor const&) = delete;
-        void operator=(Editor const&) = delete;
 
         void clear();
         void save(const std::string& filepath);
         void load_data(const std::string& data);
+
+        void undo();
 
         std::string get_content();
         bool content_changed;
@@ -51,11 +67,14 @@ class Editor {
         bool has_focus;
         bool mouse_hovered;
 
+        void unselect();
+
     // Settings:
         uint16_t page_size;
         float key_repeat_delay;
         float key_repeat_speed;
         int   opacity;
+        float undo_save_time;
         
         // Difference check timer.
         // When 'm_diff_check_timer' reaches this variable's value.
@@ -65,8 +84,14 @@ class Editor {
         void update_diff();
         
         Font font;
+        
 
     private:
+        
+        UndoStack        m_undo_stack;
+
+        float  m_undo_timer;
+        void   m_update_undo_stack();
 
         double m_diff_check_timer;
         double m_idle_timer;
@@ -80,7 +105,6 @@ class Editor {
             bool active;
         } m_select;
 
-
         std::string m_clipboard;
         
         std::map<std::string_view, int> m_color_map;
@@ -90,10 +114,13 @@ class Editor {
         std::string* get_line(int64_t y);
         void add_char(char c, int64_t x, int64_t y);
         void add_tabs(int64_t x, int64_t y, int count);
-        void rem_char(int64_t x, int64_t y); // Remove character.
+        char rem_char(int64_t x, int64_t y); // Returns the character who was removed.
+        void add_data(int64_t x, int64_t y, const std::string& data);
+        void rem_data(int64_t x, int64_t y, size_t size);
+
         int  count_begin_tabs(std::string* str); // Counts number of tabs until non-whitespace char is found.
         bool is_string_whitespace(std::string* str);
-
+    
         void move_cursor_to(int64_t x, int64_t y);
         void move_cursor(int xoff, int yoff);
         void clamp_cursor();
@@ -119,17 +146,14 @@ class Editor {
 
         std::vector<std::string> m_data;
 
+
+
         // This variables value will keep track of "preferred column" for cursor.
         // When row is changed, it should keep the same X
         // but the empty rows has to be ignored.
         int64_t m_cursor_preferred_x;
-        struct cursor_t {
-            int64_t x;
-            int64_t y;
-        } cursor;
-
-
-        struct cursor_t m_prev_cursor;
+        Cursor cursor;
+        Cursor m_prev_cursor;
 
         Editor() {}
 

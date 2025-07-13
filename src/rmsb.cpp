@@ -116,7 +116,7 @@ void RMSB::init() {
     SetTargetFPS(this->fps_limit);
     //SetTraceLogCallback(tracelog_callback);
     
-    ToggleBorderlessWindowed();
+    //ToggleBorderlessWindowed();
 
     int current_mon = GetCurrentMonitor();
     this->monitor_width = GetMonitorWidth(current_mon);
@@ -168,7 +168,7 @@ uint32_t RMSB::create_ssbo(int binding_point, size_t size) {
 }
 
 void RMSB::quit() {
-    printf("%s\n", __func__);
+    printf("%s: %s\n", __FILE__, __func__);
 
     if(this->output_shader.id > 0) {
         unload_shader(&this->output_shader);

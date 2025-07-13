@@ -66,9 +66,15 @@ void Editor::init() {
     m_select.active = false;
     m_cursor_preferred_x = 0;
 
+
     this->init_syntax_colors();
     this->clear();
     update_charsize();
+
+    m_undo_stack.allocate(1000);
+    
+    m_undo_timer = 0;
+    this->undo_save_time = 2.0;
 
     cursor.x = 0;
     cursor.y = 0;
@@ -76,11 +82,92 @@ void Editor::init() {
 
 void Editor::quit() {
     UnloadFont(font);
+    m_undo_stack.free_memory();
+    printf("%s: %s\n", __FILE__, __func__);
 }
 
 void Editor::clear() {
     m_data.clear();
     //m_data.push_back("");
+}
+
+void Editor::undo() {
+    printf("\033[36m< UNDO >\033[0m \n");
+
+    UndoStep undo_step = m_undo_stack.request_undo_step();
+   
+
+    for(uint32_t i = 0; i < undo_step.num_events; i++) {
+        const UndoEvent* event = undo_step.events[i];
+        if(!event) { continue; }
+
+        switch(event->cmd) {
+            case UndoCMD::NONE:
+                printf("[NONE] ");
+                break;
+
+            case UndoCMD::CHAR_ADDED:
+                printf("[CHAR_ADDED] ");
+                rem_char(event->start_x + 1, event->start_y);
+                move_cursor_to(event->start_x, event->start_y);
+                break;
+
+            case UndoCMD::CHAR_REMOVED:
+                printf("[CHAR_REMOVED] ");
+                add_char(event->data[0], event->start_x, event->start_y);
+                move_cursor_to(event->start_x, event->start_y);
+                break;
+        }
+
+        printf("\"%s\"\n", event->data.c_str());
+    }
+
+    
+    for(uint32_t i = 0; i < undo_step.num_events; i++) {
+        m_undo_stack.pop_event();
+    }
+
+}
+ 
+void Editor::m_update_undo_stack() {
+    if(!this->has_focus) {
+        return;
+    }
+
+    m_undo_timer += GetFrameTime();
+    if(m_undo_timer < this->undo_save_time) {
+        return;
+    }
+    m_undo_timer = 0;
+
+    //printf("\033[32m --- Auto-Save undo stack ---\033[0m\n");
+    //m_undo_stack.save_step();
+
+}
+
+
+void Editor::add_data(int64_t x, int64_t y, const std::string& data) {
+
+    std::string* ln = get_line(y);
+    x = iclamp64(x, 0, ln->size()-1);
+    ln->insert(x, data);
+}
+
+void Editor::rem_data(int64_t x, int64_t y, size_t size) {
+    if(x < 0) {
+        return;
+    }
+
+    y = iclamp64(y, 0, m_data.size()-1);
+    std::string* ln = get_line(y);
+    if(x >= (int64_t)ln->size()) {
+        fprintf(stderr, "%s: Warning! Trying to remove %li bytes from from line (%li, %li)\n"
+                        "but the line is only %li bytes long: \"%s\"\n\n",
+                __func__, size, x, y, ln->size(), ln->c_str());
+        return;
+    }
+
+    ln->erase(x, size);
 }
 
 void Editor::load_data(const std::string& data) {
@@ -99,7 +186,6 @@ void Editor::load_data(const std::string& data) {
 }
 
 void Editor::save(const std::string& filepath) {
-
     std::string content = get_content();
 
     InternalLib& ilib = InternalLib::get_instance();
@@ -338,6 +424,7 @@ void Editor::update(RMSB* rmsb) {
     }
     */
 
+    m_update_undo_stack();
 
     if(this->has_focus) {
         float mouse_wheel = GetMouseWheelMove();
@@ -377,18 +464,13 @@ void Editor::update(RMSB* rmsb) {
 
     // Cursor blink
     m_cursor_color.a = (unsigned char)(pow((sin(GetTime()*8)*0.5+0.5), 3.5)*200.0)+50;
-    
+   
+
     clamp_cursor();
     m_cursor_moved = (m_prev_cursor.x != cursor.x) || (m_prev_cursor.y != cursor.y);
-
-
     handle_select_with_mouse();
 
     m_prev_cursor = cursor;
-
-    if(IsKeyPressed(KEY_ESCAPE)) {
-        m_select.active = false;
-    }
 
 
     // Update timers.
@@ -411,6 +493,10 @@ void Editor::update(RMSB* rmsb) {
         m_diff_check_timer = 0;
         update_diff();
     }
+}
+
+void Editor::unselect() {
+    m_select.active = false;
 }
 
 void Editor::get_selected(struct selectreg_t* reg) {
@@ -564,22 +650,25 @@ void Editor::add_tabs(int64_t x, int64_t y, int count) {
     }
 }
 
-void Editor::rem_char(int64_t x, int64_t y) {
+char Editor::rem_char(int64_t x, int64_t y) {
     std::string* line = get_line(y);
     const size_t line_size = line->size();
     if(line_size == 0) {
-        return;
+        return 0;
     }
     if(x-1 < 0) {
-        return;
+        return 0;
     }
+
+    char rmchr = (*line)[x-1];
 
     if(x >= (int64_t)line_size) {
         line->pop_back();
-        return;
+        return rmchr;
     }
 
     line->erase((size_t)x-1, 1);
+    return rmchr;
 }
     
 int Editor::count_begin_tabs(std::string* str) {
@@ -653,8 +742,13 @@ void Editor::handle_backspace() {
     }
 
     if(cursor.x > 0) {
-        rem_char(cursor.x, cursor.y);
-        move_cursor(-1, 0);
+        char rmchr = rem_char(cursor.x, cursor.y);
+        
+        m_undo_stack.push_event(UndoCMD::CHAR_REMOVED, cursor, rmchr);
+
+        if(rmchr != 0) {
+            move_cursor(-1, 0);
+        }
     }
     else
     if(cursor.y > 0) {
@@ -715,6 +809,9 @@ void Editor::handle_char_inputs() {
     if((c < 0x20) || (c > 0x7E)) {
         return;
     }
+
+
+    m_undo_stack.push_event(UndoCMD::CHAR_ADDED, cursor, c);
 
     add_char(c, cursor.x, cursor.y);
     cursor.x++;
@@ -780,7 +877,6 @@ void Editor::move_cursor_to(int64_t x, int64_t y) {
         && !is_string_whitespace(get_line(cursor.y))
         && m_cursor_preferred_x < cursor.x
         ) {
-
             m_cursor_preferred_x = cursor.x;
         }
         x = m_cursor_preferred_x;
@@ -811,6 +907,7 @@ void Editor::swap_line(int64_t y, int offset) {
 
 void Editor::handle_key_input(int bypassed_check) {  
     bool(*check_key)(int) = (bypassed_check) ? IsKeyPressed : IsKeyDown;
+
 
     if(check_key(INPUT_KEYS[ IK_LEFT ])) {
         move_cursor(-1, 0);
@@ -844,7 +941,7 @@ void Editor::handle_key_input(int bypassed_check) {
         }
         move_cursor(0, -1);
     }
-    
+
 
     if(check_key(INPUT_KEYS[ IK_BACKSPACE ])) {
         handle_backspace();
@@ -1121,7 +1218,9 @@ void Editor::init_syntax_colors() {
     m_color_map["BoxSDF"] = INTERNAL;
     m_color_map["TorusSDF"] = INTERNAL;
     m_color_map["BoxFrameSDF"] = INTERNAL;
-   
+    m_color_map["CylinderSDF"] = INTERNAL;
+    m_color_map["LineSDF"] = INTERNAL;
+
     m_color_map["#include"] = PREPROC;
     m_color_map["#define"] = PREPROC;
 
@@ -1131,7 +1230,11 @@ void Editor::init_syntax_colors() {
     m_color_map["Mshine"] = INTERNAL;
     m_color_map["MreflectN"] = INTERNAL;
     m_color_map["Mopaque"] = INTERNAL;
+    m_color_map["Mcanglow"] = INTERNAL;
 
+    m_color_map["EmptyMaterial"] = INTERNAL;
+    m_color_map["MapValue"] = INTERNAL;
+    m_color_map["PerlinNoise2D"] = INTERNAL;
     m_color_map["ColorRGB"] = INTERNAL;
     m_color_map["Ray"] = GLOBAL;
     m_color_map["CameraInputRotation"] = INTERNAL;
