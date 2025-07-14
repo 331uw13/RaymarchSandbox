@@ -33,7 +33,17 @@ enum UndoCMD {
     NONE,
 
     CHAR_ADDED,
-    CHAR_REMOVED
+    CHAR_REMOVED,
+
+    STR_ADDED,
+    STR_REMOVED,
+
+    LINE_ADDED,
+    LINE_REMOVED,
+
+    LINE_SPLIT,
+
+    STR_MOVED
 };
 
 struct UndoEvent {
@@ -41,7 +51,9 @@ struct UndoEvent {
     enum UndoCMD cmd;
     int64_t start_x;
     int64_t start_y;
+
     std::string data;
+
 
     void clear() {
         cmd = UndoCMD::NONE;
@@ -75,7 +87,6 @@ struct UndoStep {
     }
 };
 
-
 class UndoStack {
 
     public:
@@ -88,13 +99,14 @@ class UndoStack {
 
         void push_event(enum UndoCMD cmd, const Cursor& cur, const std::string& data);
         void push_event(enum UndoCMD cmd, const Cursor& cur, char data);
+        void push_event(enum UndoCMD cmd, const Cursor& cur);
+
         void pop_event();
         void clear_events();
+        UndoEvent* latest_event();// <- Returns NULL if there are no events.
 
         void save_step();
-        UndoStep request_undo_step();
-        
-
+        UndoStep   request_undo_step(); 
 
     private:
 

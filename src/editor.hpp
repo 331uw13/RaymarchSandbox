@@ -29,8 +29,7 @@ struct Cursor {
     int64_t y;
 };
 
-#define ASCII_MAX 127
-
+#define MAX_TAB_WIDTH 8
 
 class Editor {
     public:
@@ -120,7 +119,8 @@ class Editor {
 
         int  count_begin_tabs(std::string* str); // Counts number of tabs until non-whitespace char is found.
         bool is_string_whitespace(std::string* str);
-    
+        bool is_tab_being_removed(const Cursor& cur);
+
         void move_cursor_to(int64_t x, int64_t y);
         void move_cursor(int xoff, int yoff);
         void clamp_cursor();
@@ -173,6 +173,8 @@ class Editor {
         Color m_foreground_color;
         Color m_comment_color;
         Color m_selected_color;
+
+        char m_tab_width_str[MAX_TAB_WIDTH+1];
 
         void update_charsize();
 

@@ -9,7 +9,8 @@
 #define FONT_FILEPATH "./Px437_IBM_Model3x_Alt4.ttf"
 #define FONT_SPACING 1.0
 #define PADDING 3
-#define TAB_WIDTH 4
+#define TAB_WIDTH 4  // See editor.hpp for max tab width.
+
 
 static const int INPUT_KEYS[] = {
     KEY_LEFT,
@@ -66,7 +67,6 @@ void Editor::init() {
     m_select.active = false;
     m_cursor_preferred_x = 0;
 
-
     this->init_syntax_colors();
     this->clear();
     update_charsize();
@@ -75,6 +75,11 @@ void Editor::init() {
     
     m_undo_timer = 0;
     this->undo_save_time = 2.0;
+
+    memset(m_tab_width_str, 0, MAX_TAB_WIDTH+1);
+    for(int n = 0; n < TAB_WIDTH; n++) {
+        m_tab_width_str[n] = 0x20;
+    }
 
     cursor.x = 0;
     cursor.y = 0;
@@ -102,21 +107,75 @@ void Editor::undo() {
         if(!event) { continue; }
 
         switch(event->cmd) {
-            case UndoCMD::NONE:
-                printf("[NONE] ");
-                break;
 
             case UndoCMD::CHAR_ADDED:
-                printf("[CHAR_ADDED] ");
-                rem_char(event->start_x + 1, event->start_y);
-                move_cursor_to(event->start_x, event->start_y);
+                {
+                    printf("[CHAR_ADDED] ");
+                    rem_char(event->start_x + 1, event->start_y);
+                    move_cursor_to(event->start_x, event->start_y);
+                }
                 break;
 
             case UndoCMD::CHAR_REMOVED:
-                printf("[CHAR_REMOVED] ");
-                add_char(event->data[0], event->start_x, event->start_y);
-                move_cursor_to(event->start_x, event->start_y);
+                {
+                    printf("[CHAR_REMOVED] ");
+                    int64_t index = event->start_x - 1;
+                    add_char(event->data[0], index, event->start_y);
+                    move_cursor_to(event->start_x-1, event->start_y);
+                }
                 break;
+
+            case UndoCMD::STR_ADDED:
+                {
+                    printf("[STR_ADDED] ");
+                    rem_data(event->start_x, event->start_y, event->data.size());
+                }
+                break;
+
+            case UndoCMD::STR_REMOVED:
+                {
+                    printf("[STR_REMOVED] ");
+                    add_data(event->start_x, event->start_y, event->data);
+                }
+                break;
+           
+
+            case UndoCMD::LINE_ADDED:
+                {
+                    printf("[LINE_ADDED] ");
+                    m_data.erase(m_data.begin() + event->start_y+1);
+                }
+                break;
+
+            case UndoCMD::LINE_REMOVED:
+                {
+                    printf("[LINE_REMOVED] ");
+                    m_data.insert(m_data.begin() + event->start_y+1, "");
+                }
+                break;
+
+
+            case UndoCMD::LINE_SPLIT:
+                {
+                    std::string* above = get_line(event->start_y);
+                    *above += event->data;
+                    m_data.erase(m_data.begin() + event->start_y + 1);
+                }
+                break;
+
+            case UndoCMD::STR_MOVED:
+                {
+                    printf("[STR_MOVED] ");
+                    
+                    add_data(event->start_x, event->start_y, event->data);
+                }
+                break;
+
+            case UndoCMD::NONE:
+            default:
+                printf("[NONE] ");
+                break;
+
         }
 
         printf("\"%s\"\n", event->data.c_str());
@@ -147,14 +206,16 @@ void Editor::m_update_undo_stack() {
 
 
 void Editor::add_data(int64_t x, int64_t y, const std::string& data) {
-
     std::string* ln = get_line(y);
-    x = iclamp64(x, 0, ln->size()-1);
+    x = iclamp64(x, 0, ln->size());
     ln->insert(x, data);
 }
 
 void Editor::rem_data(int64_t x, int64_t y, size_t size) {
     if(x < 0) {
+        return;
+    }
+    if(m_data.empty()) {
         return;
     }
 
@@ -701,30 +762,105 @@ void Editor::remove_selected() {
     std::string* first_line = get_line(reg.start_y);
     std::string* last_line = get_line(reg.end_y);
 
-    if(reg.start_y == reg.end_y) { /* Remove one line selection */
+    if(reg.start_y == reg.end_y) {
+        /* Remove one line selection */
+
+        m_undo_stack.push_event(
+                UndoCMD::STR_REMOVED,
+                (Cursor){ reg.start_x, reg.start_y }, 
+                first_line->substr(reg.start_x, reg.end_x - reg.start_x));
+        m_undo_stack.save_step();
+        
         first_line->erase(reg.start_x, reg.end_x - reg.start_x);
         this->cursor.x = reg.start_x;
     }
-    else { /* Remove multiline selection */
-
-        if(reg.start_x < first_line->size()) {
-            first_line->erase(reg.start_x, first_line->size() - reg.start_x);
-        }
+    else {
+        /* Remove multiline selection */
 
         const uint64_t lastsub_start = reg.end_x;
         const int64_t lastsub_end = last_line->size() - reg.end_x;
+        
+        uint32_t lines_removed = 0;
+
+        // TODO: Make this shit safer and easier to read.
+        //       no real reason to have lastsub_start and lastsub_end.
+        
+        // Move/Remove parts of first and last lines.
+       
+
+        if(reg.start_x < first_line->size()) {
+            /* Part of first line was selected */
+            m_undo_stack.push_event(
+                    UndoCMD::STR_REMOVED, 
+                    (Cursor){ (int64_t)reg.start_x, (int64_t)reg.start_y },
+                    first_line->substr(reg.start_x, first_line->size() - reg.start_x)
+                    );
+            
+            first_line->erase(reg.start_x, first_line->size() - reg.start_x);
+        }
+        else {
+            /* All of first line was selected */
+            Cursor cur = (Cursor){ (int64_t)reg.start_x, (int64_t)reg.start_y };
+            m_undo_stack.push_event(UndoCMD::STR_REMOVED, cur, *first_line);
+            lines_removed++;
+        }
+
+
+        // Need to add lines in between to the undo stack.
+        // Reason why this must be added right here is because
+        // the order of undo stack really matters.
+        for(uint64_t i = reg.start_y+1; i < reg.end_y; i++) {
+            const Cursor cur = (Cursor){ 0, (int64_t)i };
+            m_undo_stack.push_event(UndoCMD::STR_REMOVED, cur, *get_line(i));
+            lines_removed++;
+        }
 
         if((lastsub_end > 0)
         && (lastsub_end < (int64_t)last_line->size())) {
+            /* Part of last line was selected */
+            /* The remaining part is moved to the first line. */
+
+            m_undo_stack.push_event(
+                    UndoCMD::STR_REMOVED,
+                    (Cursor){ 0, (int64_t)reg.end_y },
+                    last_line->substr(0, reg.end_x)
+                    );
+
+            m_undo_stack.push_event(
+                    UndoCMD::STR_ADDED,
+                    (Cursor){ first_line->size(), (int64_t)reg.start_y },
+                    last_line->substr(0, reg.end_x)
+                    );
+            
             *first_line += last_line->substr(lastsub_start, lastsub_end);
+
+            m_undo_stack.push_event(
+                    UndoCMD::STR_REMOVED,
+                    (Cursor){ (int64_t)reg.end_x, (int64_t)reg.end_y },
+                    last_line->substr(reg.end_x, last_line->size() - reg.end_x)
+                    );
+
         }
+        else {
+            /* All of last line was selected */
+            const Cursor cur = (Cursor){ 0, (int64_t)reg.end_y };
+            m_undo_stack.push_event(UndoCMD::STR_REMOVED, cur, *last_line);
+            lines_removed++;
+        }
+
+        for(uint32_t n = 0; n <= lines_removed; n++) {
+            const Cursor rmln_cur = (Cursor){ 0, (int64_t)reg.start_y };
+            m_undo_stack.push_event(UndoCMD::LINE_REMOVED, rmln_cur);
+        }
+
+        m_undo_stack.save_step();
 
         // Delete lines in between
         // last_line will also get deleted from the array
         // if it will not have any data left.
         m_data.erase(
                 m_data.begin() + reg.start_y + 1,
-                m_data.begin() + reg.end_y + 1//(preserve_lastln ? 0 : 1)
+                m_data.begin() + reg.end_y + 1
                 );
 
         this->cursor.x = reg.start_x;
@@ -734,6 +870,28 @@ void Editor::remove_selected() {
     m_select.active = false;
     
 }
+        
+bool Editor::is_tab_being_removed(const Cursor& cur) {
+    std::string* current = get_line(cur.y);
+
+    int64_t x = cur.x-1;
+    if(x < 0) {
+        return false;
+    }
+
+    int count = 0;
+    for(int64_t i = x; i >= 0; i--) {
+        if((*current)[i] != 0x20) {
+            break;
+        }
+        count++;
+        if(count >= TAB_WIDTH) {
+            break;
+        }
+    }
+
+    return (count == TAB_WIDTH);
+}
 
 void Editor::handle_backspace() {
     if(m_select.active) {
@@ -742,16 +900,27 @@ void Editor::handle_backspace() {
     }
 
     if(cursor.x > 0) {
-        char rmchr = rem_char(cursor.x, cursor.y);
-        
-        m_undo_stack.push_event(UndoCMD::CHAR_REMOVED, cursor, rmchr);
+        /* Remove single character */
+        if(!is_tab_being_removed(cursor)) {
+            char rmchr = rem_char(cursor.x, cursor.y);
+            
+            m_undo_stack.push_event(UndoCMD::CHAR_REMOVED, cursor, rmchr);
 
-        if(rmchr != 0) {
-            move_cursor(-1, 0);
+            if(rmchr != 0) {
+                move_cursor(-1, 0);
+            }
         }
+        else {
+            rem_data(cursor.x - TAB_WIDTH, cursor.y, TAB_WIDTH);
+            m_undo_stack.push_event(UndoCMD::STR_REMOVED, cursor, m_tab_width_str);
+            move_cursor(-TAB_WIDTH, 0);
+        }
+            
+        m_undo_stack.save_step();
     }
     else
     if(cursor.y > 0) {
+        /* Remove line and move remaining to line above */
         cursor.x = 0;
         
         std::string* up = get_line(cursor.y-1);
@@ -776,12 +945,22 @@ void Editor::handle_enter() {
     m_data.insert(m_data.begin()+cursor.y+1, ""); // Add new line.
 
     if(cursor.x < (int64_t)current_size) {
+        /* Line was split */
+
+        m_undo_stack.push_event(UndoCMD::LINE_SPLIT, cursor,
+                current->substr(cursor.x, current_size - cursor.x));
+
         std::string* below = get_line(cursor.y+1);
-        
         *below += current->substr(cursor.x);
         current->erase(cursor.x, current->size());
-        cursor.x = 0;
+        //cursor.x = 0;
     }
+    else{
+        /* Empty line added */
+        m_undo_stack.push_event(UndoCMD::LINE_ADDED, cursor);
+    }
+        
+    m_undo_stack.save_step();
 
     // Add tabs to the just added new line 
     // so it starts at the same column automatically.
@@ -790,8 +969,8 @@ void Editor::handle_enter() {
         add_tabs(0, cursor.y+1, num_btabs);
     }
 
-    cursor.x = num_btabs * TAB_WIDTH;
     move_cursor(0, 1);
+    cursor.x = num_btabs * TAB_WIDTH;
 }
 
 
