@@ -14,8 +14,6 @@
 -----------------------------------
 
 
-
-
 ## Building instructions.
 
 ```bash
@@ -29,8 +27,18 @@ make
 -----------------------------------
 
 
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/rmsb-intro.png?raw=true)
+
 
 ## Recent Updates
+
+* Tue Jul 15 2025
+```
+- Changed how colors are handled for rays.
+- Changed undo functionality.
+- Updated internal.glsl
+- Shader errors now report the correct row for the user
+```
 
 * Sun Jul 13 2025
 ```
@@ -49,19 +57,4 @@ make
 - Added translucent material property.
 - Small improvements
 ```
-
-* Thu Jul 3 2025
-```
-- Custom uniform inputs will now remember their values even when restarted.
-- Reflections now work with fog correctly.
-- Small improvements.
-```
-
-* Wed Jul 2 2025
-```
-- Moved to using compute shader for raymarching.
-- Internal library is now read from `internal.glsl` file
-- Added reflection option "MreflectN" for material.
-```
-
 
