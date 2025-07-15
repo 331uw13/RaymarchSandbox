@@ -20,7 +20,7 @@
 git clone https://github.com/331uw13/RaymarchSandbox.git
 cd RaymarchSandbox
 git clone https://github.com/ocornut/imgui.git
-make
+make -j4
 ./rmsb examples/intro.glsl
 ```
 
@@ -38,6 +38,7 @@ make
 - Changed undo functionality.
 - Updated internal.glsl
 - Shader errors now report the correct row for the user
+- Changed examples
 ```
 
 * Sun Jul 13 2025
