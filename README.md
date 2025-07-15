@@ -31,6 +31,9 @@ make -j4
 -----------------------------------
 
 ## About internal.glsl
+> [!NOTE]
+> Work in progress. Some functions may return unexpected results.
+
 `internal.glsl` is the "library" for the Raymarch Sandbox.
 It has all the functions written to allow user to create 3D scenes.
 By default it contains useful functions for raymarching, coloring the materials, gradient noise functions and miscellaneous utilities.
