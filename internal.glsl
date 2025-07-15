@@ -23,6 +23,8 @@ uniform vec3 CameraInputPosition;
 
 #define RAINBOW_PALETTE vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5),vec3(1.0, 1.0, 1.0), vec3(0.0, 0.33, 0.67)
 
+#define NO_TRANSLUCENT_COLORS\
+    vec3 raycolor_translucent(){ return vec3(0); }
 
 
 #define Material mat4x3
@@ -48,13 +50,18 @@ TODO: Add more info
 
 User must define this function for colorize transparent materials.
 Notes/Tips:
-   - Ray.mat      : what material is being processed.
-   - Ray.vm_len   : distance enter point to exit point.
-
+   - Ray.mat      : Material is being processed.
+   - Ray.vm_len   : Distance from enter point to exit point.
 */
-FUNC void vm_map();
+FUNC vec3 raycolor_translucent();
 FUNC_END
 
+
+/* -INFO
+This function is called when the ray needs a color.
+*/
+FUNC vec3 raycolor();
+FUNC_END
 
 
 
@@ -64,6 +71,7 @@ RAY_T Ray;
 */
 struct RAY_T
 {
+    vec3  solid_color;
     vec3  volume_color;
 
     int   hit;
@@ -78,6 +86,21 @@ struct RAY_T
     Material reflectoff_mat;
 };
 RAY_T Ray;
+
+
+
+void entry();
+void main() {
+    Ray.volume_color = vec3(0, 0, 0);
+    Ray.hit = 0;
+    Ray.len = 0;
+    Ray.vm_len = 0;
+    Ray.mat = Material(0);
+    Ray.closest_mat = Material(0);
+    Ray.reflectoff_mat = Material(0);
+    Ray.reflect_len = 0;
+    entry();
+}
 
 
 /* -INFO
@@ -104,10 +127,10 @@ FUNC_END
 /* -INFO
 Set color for the current pixel.
 */
-FUNC void SetPixel(vec3 color)
+FUNC void Done()
 {
-    color += Ray.volume_color;
-    imageStore(output_img, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
+    vec3 ray_color = Ray.solid_color + Ray.volume_color;
+    imageStore(output_img, ivec2(gl_GlobalInvocationID.xy), vec4(ray_color, 1.0));
 }
 FUNC_END
 
@@ -178,6 +201,27 @@ FUNC vec3 ComputeNormal(vec3 p)
 }
 FUNC_END
 
+/* -INFO
+Linear interpolation function.
+*/
+FUNC float Lerp(float t, float min, float max)
+{
+    return (max - min) * t + min;
+}
+FUNC_END
+
+/* -INFO
+Interpolate between 2 3D vectors.
+*/
+FUNC vec3 Vec3Lerp(float t, vec3 a, vec3 b)
+{
+    return vec3(
+            Lerp(t, a.x, b.x),
+            Lerp(t, a.y, b.y),
+            Lerp(t, a.z, b.z)
+            );
+}
+FUNC_END
 
 int _FLAG_reflect = 0;
 void Raymarch_I(vec3 ro, vec3 rd);
@@ -193,23 +237,31 @@ FUNC void Raymarch(vec3 ro, vec3 rd)
 {
     _FLAG_reflect = 0;
     Ray.closest_mat = EmptyMaterial();
+    
     Ray.volume_color = vec3(0);
+    Ray.solid_color = vec3(0);
+
     Raymarch_I(ro, rd);
     
     if(_FLAG_reflect == 1) {
-        Ray.reflect_len = 0.0;
+        //Ray.reflect_len = 0.0;
         vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
         vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
-        
-        float rl = Ray.len;
+
+        RAY_T Oray = Ray; // Original ray.
+
         Ray.reflectoff_mat = Ray.mat;
         Raymarch_I(new_ro, new_rd);
+        RAY_T rayR = Ray; // Reflected ray.
+        Ray = Oray;
+      
+        Ray.solid_color = clamp(Ray.solid_color, vec3(0), vec3(1));
+        rayR.solid_color = clamp(rayR.solid_color, vec3(0), vec3(1));
+        
+        const float  R = MreflectN(Ray.mat);
 
-        if(Ray.hit == 1) {
-            Mdiffuse(Ray.mat) = mix(Mdiffuse(Ray.reflectoff_mat), Mdiffuse(Ray.mat), 0.5);
-        }
-        Ray.reflect_len = Ray.len;
-        Ray.len = rl;
+        Ray.solid_color = Vec3Lerp(R, Ray.solid_color, rayR.solid_color);
+        Ray.volume_color += Vec3Lerp(R, vec3(0), rayR.volume_color);
     }
 }
 FUNC_END
@@ -225,7 +277,9 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
     Ray.vm_len = 0.0;
     Ray.pos = ro;
     Ray.mat = Material(0);
-    
+   
+    Ray.volume_color = vec3(0);
+
     int ray_outside = 1;
 
     while(Ray.len < MAX_RAY_LENGTH) {
@@ -239,6 +293,7 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
             if(Mdistance(c) <= HIT_DISTANCE) {
                 Ray.hit = 1;
                 Ray.mat = c;
+
 
                 if(MreflectN(c) > 0.0) {
                     _FLAG_reflect = 1;
@@ -261,7 +316,8 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
 
             Material c = map(Ray.pos);
             if(Mdistance(c) >= HIT_DISTANCE+0.01) {
-                vm_map();
+                Ray.volume_color += raycolor_translucent();
+                Ray.volume_color = clamp(Ray.volume_color, vec3(0), vec3(1));
                 Ray.mat = c;
                 Ray.len += Ray.vm_len;
                 ray_outside = 1;
@@ -269,6 +325,8 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
             Ray.vm_len += TRANSLUCENT_STEP_SIZE;
         }       
     }
+    
+    Ray.solid_color += raycolor();
 }
 FUNC_END
 
@@ -329,17 +387,17 @@ Calculate light values for the material 'm'
 */
 FUNC vec3 LightDirectional(vec3 eye, vec3 direction, vec3 color, vec3 normal, Material m)
 {
-    direction = -direction;
+    vec3 light_dir = -normalize(direction);
+    float diff = max(dot(normal, light_dir), 0.0);
+    vec3 diffuse = diff * Mdiffuse(m);
+
     vec3 view_dir = normalize(eye - Ray.pos);
-    vec3 halfway_dir = normalize(direction - view_dir);
+    vec3 halfway_dir = normalize(light_dir - view_dir);
+    float shine = 5.0;
+    float spec = pow(max(dot(view_dir, halfway_dir), 0.0), shine);
+    vec3 specular = spec * Mspecular(m);
 
-    float nh_dot = max(dot(normal, halfway_dir), 0.0);
-    float shine = 5.0; // TODO: Create input for this.
-
-    vec3 specular = color + pow(nh_dot, shine) * Mspecular(m);
-    float diffuse = max(dot(normal, direction), 0.0);
-
-    return (specular * diffuse) * Mdiffuse(m);
+    return mix(diffuse, specular, 0.5);
 }
 FUNC_END
 
@@ -374,6 +432,32 @@ FUNC vec3 LightPoint(vec3 eye, vec3 pos, vec3 color, float radius, float att, ve
 FUNC_END
 
 /* -INFO
+Based on: https://iquilezles.org/articles/fog/
+*/
+FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color, float e)
+{
+    float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
+    float reflect_n = MreflectN(Ray.reflectoff_mat);
+    if(reflect_n > 0) { 
+        // Fog has to be applied to the reflection ray
+        // and the shape itself.
+
+        // Mix fog and the shape color which the ray reflected off.
+        vec3 fog_color_refl = mix(Mdiffuse(Ray.reflectoff_mat), fog_color, 0.2);
+        float fog_amount_refl = 1.0 - exp(-(Ray.len*0.01) * density);
+        
+        vec3 color = mix(current_color, fog_color_refl, fog_amount_refl);
+        return mix(color, fog_color, pow(fog_amount, e));
+    }
+    else {
+        return mix(current_color, fog_color, pow(fog_amount, e));
+    }
+
+    return current_color;
+}
+FUNC_END
+
+/* -INFO
 https://iquilezles.org/articles/palettes/
 Example: vec3 color = Palette(time, RAINBOW_PALETTE);
 */
@@ -383,34 +467,6 @@ FUNC vec3 Palette(float t, vec3 a, vec3 b, vec3 c, vec3 d)
 }
 FUNC_END
 
-/* -INFO
-Based on: https://iquilezles.org/articles/fog/
-TODO: Clean this up.
-
-*/
-FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color, float e)
-{
-    float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
-    if(MreflectN(Ray.reflectoff_mat) > 0) { /* Shape is reflective */
-
-        // Fog has to be applied to the reflection ray
-        // and the shape itself.
-
-        // Mix fog and the shape color which the ray reflected off.
-        vec3 fog_color_refl = mix(Mdiffuse(Ray.reflectoff_mat), fog_color, 0.5);
-        float fog_amount_refl = 1.0 - exp(-(Ray.reflect_len*0.01) * density);
-        
-        vec3 color = mix(current_color, fog_color_refl, fog_amount_refl);
-
-        return mix(color, fog_color, pow(fog_amount, e));
-    }
-    else { /* Non-reflective */
-        return mix(current_color, fog_color, pow(fog_amount, e));
-    }
-
-    return current_color;
-}
-FUNC_END
 
 /* -INFO
 Map value t from src range to dst range.
@@ -552,6 +608,147 @@ FUNC float PerlinNoise2D(vec2 P)
 }
 FUNC_END
 
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+vec4 _fade(vec4 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
+
+/* -INFO
+3D Perlin noise by Stefan Gustavson (https://github.com/stegu/webgl-noise)
+*/
+FUNC float PerlinNoise3D(vec3 p)
+{
+  vec4 P = vec4(p, 1.0);
+  vec4 Pi0 = floor(P); // Integer part for indexing
+  vec4 Pi1 = Pi0 + 1.0; // Integer part + 1
+  Pi0 = mod(Pi0, 289.0);
+  Pi1 = mod(Pi1, 289.0);
+  vec4 Pf0 = fract(P); // Fractional part for interpolation
+  vec4 Pf1 = Pf0 - 1.0; // Fractional part - 1.0
+  vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+  vec4 iy = vec4(Pi0.yy, Pi1.yy);
+  vec4 iz0 = vec4(Pi0.zzzz);
+  vec4 iz1 = vec4(Pi1.zzzz);
+  vec4 iw0 = vec4(Pi0.wwww);
+  vec4 iw1 = vec4(Pi1.wwww);
+
+  vec4 ixy = _permute(_permute(ix) + iy);
+  vec4 ixy0 = _permute(ixy + iz0);
+  vec4 ixy1 = _permute(ixy + iz1);
+  vec4 ixy00 = _permute(ixy0 + iw0);
+  vec4 ixy01 = _permute(ixy0 + iw1);
+  vec4 ixy10 = _permute(ixy1 + iw0);
+  vec4 ixy11 = _permute(ixy1 + iw1);
+
+  vec4 gx00 = ixy00 / 7.0;
+  vec4 gy00 = floor(gx00) / 7.0;
+  vec4 gz00 = floor(gy00) / 6.0;
+  gx00 = fract(gx00) - 0.5;
+  gy00 = fract(gy00) - 0.5;
+  gz00 = fract(gz00) - 0.5;
+  vec4 gw00 = vec4(0.75) - abs(gx00) - abs(gy00) - abs(gz00);
+  vec4 sw00 = step(gw00, vec4(0.0));
+  gx00 -= sw00 * (step(0.0, gx00) - 0.5);
+  gy00 -= sw00 * (step(0.0, gy00) - 0.5);
+
+  vec4 gx01 = ixy01 / 7.0;
+  vec4 gy01 = floor(gx01) / 7.0;
+  vec4 gz01 = floor(gy01) / 6.0;
+  gx01 = fract(gx01) - 0.5;
+  gy01 = fract(gy01) - 0.5;
+  gz01 = fract(gz01) - 0.5;
+  vec4 gw01 = vec4(0.75) - abs(gx01) - abs(gy01) - abs(gz01);
+  vec4 sw01 = step(gw01, vec4(0.0));
+  gx01 -= sw01 * (step(0.0, gx01) - 0.5);
+  gy01 -= sw01 * (step(0.0, gy01) - 0.5);
+
+  vec4 gx10 = ixy10 / 7.0;
+  vec4 gy10 = floor(gx10) / 7.0;
+  vec4 gz10 = floor(gy10) / 6.0;
+  gx10 = fract(gx10) - 0.5;
+  gy10 = fract(gy10) - 0.5;
+  gz10 = fract(gz10) - 0.5;
+  vec4 gw10 = vec4(0.75) - abs(gx10) - abs(gy10) - abs(gz10);
+  vec4 sw10 = step(gw10, vec4(0.0));
+  gx10 -= sw10 * (step(0.0, gx10) - 0.5);
+  gy10 -= sw10 * (step(0.0, gy10) - 0.5);
+
+  vec4 gx11 = ixy11 / 7.0;
+  vec4 gy11 = floor(gx11) / 7.0;
+  vec4 gz11 = floor(gy11) / 6.0;
+  gx11 = fract(gx11) - 0.5;
+  gy11 = fract(gy11) - 0.5;
+  gz11 = fract(gz11) - 0.5;
+  vec4 gw11 = vec4(0.75) - abs(gx11) - abs(gy11) - abs(gz11);
+  vec4 sw11 = step(gw11, vec4(0.0));
+  gx11 -= sw11 * (step(0.0, gx11) - 0.5);
+  gy11 -= sw11 * (step(0.0, gy11) - 0.5);
+
+  vec4 g0000 = vec4(gx00.x,gy00.x,gz00.x,gw00.x);
+  vec4 g1000 = vec4(gx00.y,gy00.y,gz00.y,gw00.y);
+  vec4 g0100 = vec4(gx00.z,gy00.z,gz00.z,gw00.z);
+  vec4 g1100 = vec4(gx00.w,gy00.w,gz00.w,gw00.w);
+  vec4 g0010 = vec4(gx10.x,gy10.x,gz10.x,gw10.x);
+  vec4 g1010 = vec4(gx10.y,gy10.y,gz10.y,gw10.y);
+  vec4 g0110 = vec4(gx10.z,gy10.z,gz10.z,gw10.z);
+  vec4 g1110 = vec4(gx10.w,gy10.w,gz10.w,gw10.w);
+  vec4 g0001 = vec4(gx01.x,gy01.x,gz01.x,gw01.x);
+  vec4 g1001 = vec4(gx01.y,gy01.y,gz01.y,gw01.y);
+  vec4 g0101 = vec4(gx01.z,gy01.z,gz01.z,gw01.z);
+  vec4 g1101 = vec4(gx01.w,gy01.w,gz01.w,gw01.w);
+  vec4 g0011 = vec4(gx11.x,gy11.x,gz11.x,gw11.x);
+  vec4 g1011 = vec4(gx11.y,gy11.y,gz11.y,gw11.y);
+  vec4 g0111 = vec4(gx11.z,gy11.z,gz11.z,gw11.z);
+  vec4 g1111 = vec4(gx11.w,gy11.w,gz11.w,gw11.w);
+
+  vec4 norm00 = taylorInvSqrt(vec4(dot(g0000, g0000), dot(g0100, g0100), dot(g1000, g1000), dot(g1100, g1100)));
+  g0000 *= norm00.x;
+  g0100 *= norm00.y;
+  g1000 *= norm00.z;
+  g1100 *= norm00.w;
+
+  vec4 norm01 = taylorInvSqrt(vec4(dot(g0001, g0001), dot(g0101, g0101), dot(g1001, g1001), dot(g1101, g1101)));
+  g0001 *= norm01.x;
+  g0101 *= norm01.y;
+  g1001 *= norm01.z;
+  g1101 *= norm01.w;
+
+  vec4 norm10 = taylorInvSqrt(vec4(dot(g0010, g0010), dot(g0110, g0110), dot(g1010, g1010), dot(g1110, g1110)));
+  g0010 *= norm10.x;
+  g0110 *= norm10.y;
+  g1010 *= norm10.z;
+  g1110 *= norm10.w;
+
+  vec4 norm11 = taylorInvSqrt(vec4(dot(g0011, g0011), dot(g0111, g0111), dot(g1011, g1011), dot(g1111, g1111)));
+  g0011 *= norm11.x;
+  g0111 *= norm11.y;
+  g1011 *= norm11.z;
+  g1111 *= norm11.w;
+
+  float n0000 = dot(g0000, Pf0);
+  float n1000 = dot(g1000, vec4(Pf1.x, Pf0.yzw));
+  float n0100 = dot(g0100, vec4(Pf0.x, Pf1.y, Pf0.zw));
+  float n1100 = dot(g1100, vec4(Pf1.xy, Pf0.zw));
+  float n0010 = dot(g0010, vec4(Pf0.xy, Pf1.z, Pf0.w));
+  float n1010 = dot(g1010, vec4(Pf1.x, Pf0.y, Pf1.z, Pf0.w));
+  float n0110 = dot(g0110, vec4(Pf0.x, Pf1.yz, Pf0.w));
+  float n1110 = dot(g1110, vec4(Pf1.xyz, Pf0.w));
+  float n0001 = dot(g0001, vec4(Pf0.xyz, Pf1.w));
+  float n1001 = dot(g1001, vec4(Pf1.x, Pf0.yz, Pf1.w));
+  float n0101 = dot(g0101, vec4(Pf0.x, Pf1.y, Pf0.z, Pf1.w));
+  float n1101 = dot(g1101, vec4(Pf1.xy, Pf0.z, Pf1.w));
+  float n0011 = dot(g0011, vec4(Pf0.xy, Pf1.zw));
+  float n1011 = dot(g1011, vec4(Pf1.x, Pf0.y, Pf1.zw));
+  float n0111 = dot(g0111, vec4(Pf0.x, Pf1.yzw));
+  float n1111 = dot(g1111, Pf1);
+
+  vec4 fade_xyzw = _fade(Pf0);
+  vec4 n_0w = mix(vec4(n0000, n1000, n0100, n1100), vec4(n0001, n1001, n0101, n1101), fade_xyzw.w);
+  vec4 n_1w = mix(vec4(n0010, n1010, n0110, n1110), vec4(n0011, n1011, n0111, n1111), fade_xyzw.w);
+  vec4 n_zw = mix(n_0w, n_1w, fade_xyzw.z);
+  vec2 n_yzw = mix(n_zw.xy, n_zw.zw, fade_xyzw.y);
+  float n_xyzw = mix(n_yzw.x, n_yzw.y, fade_xyzw.x);
+  return 2.2 * n_xyzw;
+}
+FUNC_END
 
 // ----- Signed Distance Functions -----
 
