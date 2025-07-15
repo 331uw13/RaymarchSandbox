@@ -9,7 +9,7 @@
 // This function will map all the materials for the scene.
 Material map(vec3 p) {
     
-    p.z -= 10.0;
+    p.z -= 6.0;
  
     vec3 box_pos = p + vec3(0.0, -0.5, 0.0);
     float frame_width = 0.1;
@@ -22,12 +22,6 @@ Material map(vec3 p) {
     Mdistance(box) = BoxSDF(box_pos, vec3(1.0 - frame_width*2));
     Mdiffuse(box) = Palette(length(box_pos)+time, RAINBOW_PALETTE);
     Mopaque(box) = 0;
-    
-    float pn = PerlinNoise3D(Ray.pos*1.25+time);
-    vec3 sphere_pos = p + vec3(3.5, -0.5, 0.0);
-    Material sphere = EmptyMaterial();
-    Mdistance(sphere) = SphereSDF(sphere_pos, 1.0+pn*0.5);
-    MreflectN(sphere) = 0.1;
     
     // Add ground to demonstrate the fog effect better.
     float ground_pattern = 
@@ -42,7 +36,6 @@ Material map(vec3 p) {
     Material result = ground;
     result = MaterialMin(result, box);
     result = MaterialMin(result, frame);
-    result = MaterialMin(result, sphere);
     
     return result;
 }
