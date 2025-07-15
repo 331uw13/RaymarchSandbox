@@ -109,7 +109,6 @@ class RMSB {
     private:
 
         bool m_first_shader_load;
-        Vector2 m_screen_size_prev; // Changed by 'set_fullscreen()' function.
         Vector2 m_mouse_pos;
         struct infotext_t m_infolog[INFO_ARRAY_MAX_SIZE];
         size_t m_infolog_size;
@@ -120,6 +119,7 @@ class RMSB {
         void run_shader_startup_cmd(const std::string* shader_code);
         void get_cmdline_value(const std::string& code_line, float values[4]);
         void process_shader_startup_cmd_line(const std::string& code_line);
+        
     
         // @startup_command  and @end are not valid glsl code.
         // they must be removed after reading.

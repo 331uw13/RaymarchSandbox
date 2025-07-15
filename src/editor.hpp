@@ -68,12 +68,15 @@ class Editor {
 
         void unselect();
 
+
+        int64_t error_row;
+        int64_t error_column;
+
     // Settings:
         uint16_t page_size;
         float key_repeat_delay;
         float key_repeat_speed;
         int   opacity;
-        float undo_save_time;
         
         // Difference check timer.
         // When 'm_diff_check_timer' reaches this variable's value.
@@ -83,14 +86,14 @@ class Editor {
         void update_diff();
         
         Font font;
-        
+       
+        float undo_save_time;
 
     private:
         
-        UndoStack        m_undo_stack;
-
-        float  m_undo_timer;
-        void   m_update_undo_stack();
+        UndoStack   m_undo_stack;
+        float       m_undo_timer;
+        void        update_undo_stack();
 
         double m_diff_check_timer;
         double m_idle_timer;
@@ -173,7 +176,8 @@ class Editor {
         Color m_foreground_color;
         Color m_comment_color;
         Color m_selected_color;
-
+        Color m_margin_color;
+        
         char m_tab_width_str[MAX_TAB_WIDTH+1];
 
         void update_charsize();

@@ -116,7 +116,7 @@ void RMSB::init() {
     SetTargetFPS(this->fps_limit);
     //SetTraceLogCallback(tracelog_callback);
     
-    //ToggleBorderlessWindowed();
+    ToggleBorderlessWindowed();
 
     int current_mon = GetCurrentMonitor();
     this->monitor_width = GetMonitorWidth(current_mon);
@@ -470,11 +470,13 @@ void RMSB::reload_shader() {
     // New ones may be added or they maybe have changed.
     shader_util_reset_locations();
     
-    ErrorLog::get_instance().clear();
+    ErrorLog& error_log = ErrorLog::get_instance();
+    Editor& editor = Editor::get_instance();
     
+    std::string shader_code = editor.get_content();
+    error_log.clear();
    
-    std::string shader_code = Editor::get_instance().get_content();
-    
+
     // Add user specified uniforms from the file
     if(m_first_shader_load) {
         run_shader_startup_cmd(&shader_code);
@@ -496,7 +498,9 @@ void RMSB::reload_shader() {
     if(this->compute_shader > 0) {
         glDeleteProgram(this->compute_shader);
     }
+
     this->compute_shader = load_compute_shader(code.c_str());
+
 
     // Tell user what happened.
     if(this->compute_shader > 0) {
@@ -504,6 +508,9 @@ void RMSB::reload_shader() {
     }
     else {
         loginfo(RED, "Shader failed to compile.");
+        printf("-------------------\n%s\n-----------------------\n\n",
+                code.c_str());
+        error_log.get_error_position(&editor.error_row, &editor.error_column);
     }
     
     if(this->reset_time_on_reload) {
@@ -588,5 +595,6 @@ void RMSB::render_infolog() {
         }
     }
 }
+
 
 

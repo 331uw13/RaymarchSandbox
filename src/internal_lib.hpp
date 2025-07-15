@@ -86,7 +86,7 @@ class InternalLib {
         InternalLib(InternalLib const&) = delete;
         void operator=(InternalLib const&) = delete;
 
-        size_t lines;
+        size_t num_lines;
 
     private:
 

@@ -103,9 +103,11 @@ void InternalLib::create_source() {
     std::string info_buf = "";
     struct u8col_t document_color = UCOLOR_INFO;
 
-    this->lines = 0;
+    this->num_lines = 0;
 
     while(std::getline(file, line)) {
+        if(line.empty()) { continue; } 
+        this->num_lines++;
        
         if(line == "/* -INFO") { /* Start reading function info */
             read_func_info = true;
@@ -165,10 +167,12 @@ void InternalLib::create_source() {
             continue;
         }
 
-
-        this->lines++;
         this->source += line + '\n';
     }
+
+    // This will reset the line number count.
+    // it is being used to track the real line number for error log.
+    this->source += "#line 0\n";
 }
 
 

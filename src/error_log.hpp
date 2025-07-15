@@ -3,6 +3,7 @@
 
 #include <list>
 #include <string>
+#include <cstdint>
 
 #define ERRORLOG_WIDTH 600
 #define ERRORLOG_HEIGHT 300
@@ -26,6 +27,8 @@ class ErrorLog {
         // Avoid accidental copies.
         ErrorLog(ErrorLog const&) = delete;
         void operator=(ErrorLog const&) = delete;
+
+        void get_error_position(int64_t* row, int64_t* col);
 
     private:
 

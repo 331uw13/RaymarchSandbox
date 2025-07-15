@@ -56,6 +56,30 @@ void loop(RMSB* rmsb) {
     }
 }
 
+void create_template_shader(const char* shader_filepath) {
+    
+    const char* shader_template = 
+        "\n"
+        "Material map(vec3 p) {\n"
+        "    return EmptyMaterial();\n"
+        "}\n"
+        "\n"
+        "\n"
+        "vec3 raycolor() {\n"
+        "    return Mdiffuse(Ray.mat);\n"
+        "}\n"
+        "\n"
+        "vec3 raycolor_translucent() {\n"
+        "    return Mdiffuse(Ray.mat);\n"
+        "}\n"
+        "\n"
+        "\n"
+        "void entry() {\n"
+        "}\n"
+        ;
+
+    SaveFileText(shader_filepath, (char*)shader_template);
+}
 
 int main(int argc, char** argv) {
     if(argc != 2) {
@@ -67,16 +91,17 @@ int main(int argc, char** argv) {
     
 
     if(!FileExists(shader_filepath)) {
-        fprintf(stderr, "File \"%s\" does not exist!\n", shader_filepath);
-        return 1;
+        printf("Shader \"%s\" did not exist. Created new template\n",
+                shader_filepath);
+        create_template_shader(shader_filepath);
     }
     
     int file_size = GetFileLength(shader_filepath);
     if(file_size <= 0) {
-        fprintf(stderr, "File \"%s\" is empty.\n", shader_filepath);
+        // TODO: Get rid of this.
+        fprintf(stderr, "ERROR: Shader \"%s\" is empty.\n", shader_filepath);
         return 1;
     }
-    
 
     Editor& editor = Editor::get_instance();
     InternalLib& ilib = InternalLib::get_instance();
