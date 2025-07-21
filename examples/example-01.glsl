@@ -48,7 +48,9 @@ void entry() {
     
     Raymarch(eye, rd);
     
-    Done(); // Write results to the output texture.
+    // Write results to the output texture.
+    
+    SetPixel(GetFinalColor());
 }
 
 

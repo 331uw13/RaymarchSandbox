@@ -17,7 +17,7 @@
     - Added uniforms from "Uniform Input" tab
       are available in the code with the same name
       after reloading.
-    
+ 
     Report bugs to the project github page or dm me in discord: _331uw13
 */
 
@@ -120,7 +120,7 @@ vec3 raycolor() {
     }
     
     vec3 normal = ComputeNormal(Ray.pos);
-    float light_strength = 2.0;
+    float light_strength = 1.5;
     vec3 light = LightDirectional(
         CameraInputPosition,
         vec3(8.0, 10.0, -3.0),
@@ -128,11 +128,9 @@ vec3 raycolor() {
         normal,
         Ray.mat
     ) * light_strength;
-    vec3 ambient = Mdiffuse(Ray.mat) * 0.1;
-    
-    float fog_exp = 2.0;
-    color += light + ambient;
-    color = ApplyFog(color, 1.8, fog_color.rgb, fog_exp);
+    vec3 ambient = Mdiffuse(Ray.mat) * 0.02;
+
+    color = light + ambient;
 
     return color;
 }
@@ -140,6 +138,10 @@ vec3 raycolor() {
 
 
 void entry() {
+
+    FOG_COLOR = fog_color.rgb;
+    FOG_DENSITY = 1.0;
+    FOG_EXPONENT = 2.0;
     
     vec3 rd = CameraInputRotation(Raydir());
     vec3 eye = CameraInputPosition;
@@ -147,7 +149,7 @@ void entry() {
     
     Raymarch(eye, rd);
     
-    Done();
+    SetPixel(GetFinalColor());
 }
 
 
@@ -158,7 +160,7 @@ void entry() {
 // from "Input" tab. Or add new ones from the gui.
 @startup_cmd
 
-ADD COLOR test_color (1.000, 0.080, 0.346, 1.000);
+ADD COLOR test_color (0.948, 0.004, 0.277, 1.000);
 ADD COLOR light_color (0.560, 1.000, 0.108, 0.882);
 ADD COLOR fog_color (0.944, 0.320, 0.254, 0.000);
 ADD COLOR transparent_color (0.145, 0.723, 0.660, 1.000);

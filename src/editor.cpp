@@ -1260,13 +1260,14 @@ void Editor::init_syntax_colors() {
     const int GLOBAL = 0x2C9633FF;
     const int PREPROC = 0x27C7D9FF;
     const int USER_FUNC = 0xD96FB7FF;
-    const int MACRO = PREPROC;
 
     m_color_map["map"] = USER_FUNC;
     m_color_map["entry"] = USER_FUNC;
     m_color_map["raycolor"] = USER_FUNC;
     m_color_map["raycolor_translucent"] = USER_FUNC;
-    m_color_map["Done"] = INTERNAL;
+    m_color_map["SetPixel"] = INTERNAL;
+    m_color_map["GetFinalColor"] = INTERNAL;
+    m_color_map["GetShadow_LightPoint"] = INTERNAL;
     m_color_map["Material"] = INTERNAL_TYPE;
     m_color_map["SphereSDF"] = INTERNAL;
     m_color_map["BoxSDF"] = INTERNAL;
@@ -1274,9 +1275,6 @@ void Editor::init_syntax_colors() {
     m_color_map["BoxFrameSDF"] = INTERNAL;
     m_color_map["CylinderSDF"] = INTERNAL;
     m_color_map["LineSDF"] = INTERNAL;
-
-    m_color_map["RAINBOW_PALETTE"] = MACRO;
-    m_color_map["NO_TRANSLUCENT_COLORS"] = MACRO;
 
     m_color_map["#include"] = PREPROC;
     m_color_map["#define"] = PREPROC;
@@ -1292,6 +1290,7 @@ void Editor::init_syntax_colors() {
     m_color_map["EmptyMaterial"] = INTERNAL;
     m_color_map["MapValue"] = INTERNAL;
     m_color_map["PerlinNoise2D"] = INTERNAL;
+    m_color_map["PerlinNoise3D"] = INTERNAL;
     m_color_map["ColorRGB"] = INTERNAL;
     m_color_map["Ray"] = GLOBAL;
     m_color_map["CameraInputRotation"] = INTERNAL;

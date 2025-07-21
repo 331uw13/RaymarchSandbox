@@ -35,14 +35,18 @@ uniform vec3 CameraInputPosition;
 #define Mopaque(x)      x[2][2]
 #define Mcanglow(x)     x[3][0]
 
+
+vec3 FOG_COLOR = vec3(0.5, 0.5, 0.5);
+float FOG_DENSITY = 1.0;
+float FOG_EXPONENT = 2.0;
+
+
 /* -INFO
 User must define this function.
    - p is the current ray position.
 */
 FUNC Material map(vec3 p);
 FUNC_END
-
-
 
 
 /* -INFO
@@ -64,7 +68,6 @@ FUNC vec3 raycolor();
 FUNC_END
 
 
-
 /* -INFO
 Raymarch function will set these variables.
 RAY_T Ray;
@@ -73,9 +76,11 @@ struct RAY_T
 {
     vec3  solid_color;
     vec3  volume_color;
-
+    float diffuse_value;
+    float alpha;
     int   hit;
     vec3  pos;
+    float first_hit_dist;
     float len;    // Ray length to first ray hit (reflection doesnt use this.)
     float vm_len; // Distance from enter point to exit point.
 
@@ -83,7 +88,6 @@ struct RAY_T
     Material closest_mat; // Closest material to ray.
 
     float reflect_len; // Ray length after hit to reflective material.
-    Material reflectoff_mat;
 };
 RAY_T Ray;
 
@@ -94,10 +98,10 @@ void main() {
     Ray.volume_color = vec3(0, 0, 0);
     Ray.hit = 0;
     Ray.len = 0;
+    Ray.first_hit_dist = -1.0;
     Ray.vm_len = 0;
     Ray.mat = Material(0);
     Ray.closest_mat = Material(0);
-    Ray.reflectoff_mat = Material(0);
     Ray.reflect_len = 0;
     entry();
 }
@@ -124,13 +128,39 @@ FUNC Material EmptyMaterial()
 }
 FUNC_END
 
+
+float GetFogFactor(float raylen) {
+    return 1.0 - exp(-(raylen*0.01) * FOG_DENSITY);
+}
+
+// https://iquilezles.org/articles/fog/
+vec3 ApplyFog(vec3 current_color, float raylen)
+{
+    return mix(current_color, FOG_COLOR*0.5, pow(GetFogFactor(raylen), FOG_EXPONENT));
+}
+
+/* -INFO
+*/
+FUNC vec3 GetFinalColor()
+{
+    if(Ray.first_hit_dist < 0) {
+        Ray.first_hit_dist = Ray.len;
+    }
+
+    vec3 
+    ray_color = ApplyFog(Ray.solid_color, Ray.len);
+    ray_color += (Ray.volume_color) * (1.0-GetFogFactor(Ray.first_hit_dist));
+    
+    return pow(ray_color, vec3(1.0/1.6));
+}
+FUNC_END
+
 /* -INFO
 Set color for the current pixel.
 */
-FUNC void Done()
+FUNC void SetPixel(vec3 color)
 {
-    vec3 ray_color = Ray.solid_color + Ray.volume_color;
-    imageStore(output_img, ivec2(gl_GlobalInvocationID.xy), vec4(ray_color, 1.0));
+    imageStore(output_img, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 }
 FUNC_END
 
@@ -244,27 +274,30 @@ FUNC void Raymarch(vec3 ro, vec3 rd)
     Raymarch_I(ro, rd);
     
     if(_FLAG_reflect == 1) {
-        //Ray.reflect_len = 0.0;
-        vec3 new_rd = normalize(reflect(rd, ComputeNormal(Ray.pos)));
-        vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE+0.01);
+        vec3 normal = ComputeNormal(Ray.pos);
+        vec3 new_rd = normalize(reflect(rd, normal));
+        vec3 new_ro = Ray.pos + (new_rd + HIT_DISTANCE*0.01);
 
         RAY_T Oray = Ray; // Original ray.
 
-        Ray.reflectoff_mat = Ray.mat;
         Raymarch_I(new_ro, new_rd);
         RAY_T rayR = Ray; // Reflected ray.
         Ray = Oray;
       
         Ray.solid_color = clamp(Ray.solid_color, vec3(0), vec3(1));
         rayR.solid_color = clamp(rayR.solid_color, vec3(0), vec3(1));
-        
-        const float  R = MreflectN(Ray.mat);
-
+       
+        vec3 view_dir = normalize(Ray.pos - ro);
+        float R = (Ray.diffuse_value + 0.25) * MreflectN(Ray.mat);
         Ray.solid_color = Vec3Lerp(R, Ray.solid_color, rayR.solid_color);
         Ray.volume_color += Vec3Lerp(R, vec3(0), rayR.volume_color);
+   
     }
 }
 FUNC_END
+
+// FIXME: reflection ray will go into the material itself
+//        if they are very close to each other.
 
 /* -INFO
 Reflections are not handled by this function.
@@ -277,11 +310,11 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
     Ray.vm_len = 0.0;
     Ray.pos = ro;
     Ray.mat = Material(0);
-   
+    Ray.diffuse_value = 0.0; 
     Ray.volume_color = vec3(0);
+    Ray.first_hit_dist = -1;
 
     int ray_outside = 1;
-
     while(Ray.len < MAX_RAY_LENGTH) {
         if(ray_outside == 1) {
             Ray.pos = ro + rd * Ray.len;
@@ -294,6 +327,9 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
                 Ray.hit = 1;
                 Ray.mat = c;
 
+                if(Ray.first_hit_dist < 0) {
+                    Ray.first_hit_dist = Ray.len;
+                }
 
                 if(MreflectN(c) > 0.0) {
                     _FLAG_reflect = 1;
@@ -325,11 +361,71 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
             Ray.vm_len += TRANSLUCENT_STEP_SIZE;
         }       
     }
-    
-    Ray.solid_color += raycolor();
+   
+
+    Ray.solid_color += ApplyFog(raycolor(), Ray.len);
+    //Ray.solid_color = ApplyFog(Ray.solid_color, Ray.len);
 }
 FUNC_END
 
+
+float MapValue(float t, float src_min, float src_max, float dst_min, float dst_max);
+
+/* -INFO
+Return a shadow value for point 'p'
+to light point.
+https://iquilezles.org/articles/rmshadows/
+*/
+FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value)
+{
+    w = MapValue(w, 0.0, 1.0, 0.001, 0.1);
+    float shadow = 1.0;
+    RAY_T old_ray = Ray;
+
+    vec3 dir = normalize(light_pos - p);
+    p += (dir * 0.01);
+ 
+    Ray.hit = 0;
+    Ray.len = 0.0;
+    Ray.vm_len = 0.0;
+    Ray.pos = p;
+    Ray.mat = Material(0);
+
+    float ph = 1e20;
+
+    while(Ray.len < MAX_RAY_LENGTH) {
+        Ray.pos = p + dir * Ray.len;
+        Material c = map(Ray.pos);
+
+        if(Mdistance(c) <= 0.0001) {
+            shadow = 0.0;
+            break;
+        }
+
+        float h = Mdistance(c);
+        float y = h * h / (2.0 * ph);
+        float d = sqrt(h*h - y*y);
+        shadow = min(shadow, d/(w*max(0.0, Ray.len-y)));
+
+        ph = h;
+
+        Ray.len += Mdistance(c);
+    }
+    Ray = old_ray;
+    return clamp(shadow, max_value, 1.0);
+}
+FUNC_END
+
+
+FUNC float AmbientOcclusion(vec3 p, int steps)
+{
+    float ao = 1.0;
+
+
+
+    return ao;
+}
+FUNC_END
 
 
 /* -INFO
@@ -387,12 +483,15 @@ Calculate light values for the material 'm'
 */
 FUNC vec3 LightDirectional(vec3 eye, vec3 direction, vec3 color, vec3 normal, Material m)
 {
+    vec3 view_dir = normalize(eye - Ray.pos);
     vec3 light_dir = -normalize(direction);
+    vec3 halfway_dir = normalize(light_dir - view_dir);
+    
+    // Diffuse.
     float diff = max(dot(normal, light_dir), 0.0);
     vec3 diffuse = diff * Mdiffuse(m);
 
-    vec3 view_dir = normalize(eye - Ray.pos);
-    vec3 halfway_dir = normalize(light_dir - view_dir);
+    // Specular.
     float shine = 5.0;
     float spec = pow(max(dot(view_dir, halfway_dir), 0.0), shine);
     vec3 specular = spec * Mspecular(m);
@@ -408,54 +507,36 @@ Calculate light values for the material 'm'
 */
 FUNC vec3 LightPoint(vec3 eye, vec3 pos, vec3 color, float radius, float att, vec3 normal, Material m)
 {
+
     vec3 light_dir = normalize(Ray.pos - pos);
     vec3 view_dir = normalize(eye - Ray.pos);
     vec3 halfway_dir = normalize(light_dir - view_dir);
 
+    // Diffuse.
+    float diff = max(dot(normal, light_dir), 0.0);
+    vec3 diffuse = diff * Mdiffuse(m);
 
-    float n_dist = clamp(distance(pos, Ray.pos), 0, radius) / radius;
+    // Specular.
+    float shine = 5.0;
+    float spec = pow(max(dot(view_dir, halfway_dir), 0.0), shine);
+    vec3 specular = spec * Mspecular(m);
     
-    n_dist = pow(n_dist, att);
-    float dist = 1.0 / (1.0 + n_dist*n_dist);
+    // Attenuation.
+    float L = 0.7;
+    float Q = 1.8;
+    float dist = clamp(distance(pos, Ray.pos), 0.0, radius) / radius;
+    dist = pow(dist, att);
+    float a = 1.0 / (2.0 + L * dist + Q * (dist * dist));
 
-    float nh_dot = max(dot(normal, halfway_dir), 0.0);
-    float shine = 5.0; // TODO: Create input for this.
+    Ray.diffuse_value = diff;
 
-    vec3 specular = color + pow(nh_dot, shine) * (Mspecular(m) * Mdiffuse(m));
-    float diffuse = max(dot(normal, light_dir), 0.0);
+    diffuse *= a;
+    specular *= a;
 
-    specular *= dist;
-    diffuse *= dist;
-
-    return (specular * diffuse) * Mdiffuse(m);
+    return diffuse + specular;
 }
 FUNC_END
 
-/* -INFO
-Based on: https://iquilezles.org/articles/fog/
-*/
-FUNC vec3 ApplyFog(vec3 current_color, float density, vec3 fog_color, float e)
-{
-    float fog_amount = 1.0 - exp(-(Ray.len*0.01) * density);
-    float reflect_n = MreflectN(Ray.reflectoff_mat);
-    if(reflect_n > 0) { 
-        // Fog has to be applied to the reflection ray
-        // and the shape itself.
-
-        // Mix fog and the shape color which the ray reflected off.
-        vec3 fog_color_refl = mix(Mdiffuse(Ray.reflectoff_mat), fog_color, 0.2);
-        float fog_amount_refl = 1.0 - exp(-(Ray.len*0.01) * density);
-        
-        vec3 color = mix(current_color, fog_color_refl, fog_amount_refl);
-        return mix(color, fog_color, pow(fog_amount, e));
-    }
-    else {
-        return mix(current_color, fog_color, pow(fog_amount, e));
-    }
-
-    return current_color;
-}
-FUNC_END
 
 /* -INFO
 https://iquilezles.org/articles/palettes/

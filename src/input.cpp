@@ -53,6 +53,10 @@ void InputHandler::handle_all_mode(RMSB* rmsb) {
             editor.open = rmsb->gui.open;
             break;
 
+        case KEY_G:
+            rmsb->reload_lib();
+            break;
+
         case KEY_R:
             rmsb->reload_shader();
             break;

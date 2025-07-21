@@ -14,6 +14,7 @@ static const char* const g_keybinds[][32] = {
     { "GLSL Editor", "CTRL + E", "(All)" },
     { "Toggle Editor And Gui", "CTRL + A", "(All)" },
     { "Reload shader", "CTRL + R", "(All)" },
+    { "Reload internal.glsl", "CTRL + G", "(All)" },
     { "Gui/Settings", "CTRL + F", "(All)" },
     { "Toggle Camera Input", "CTRL + C", "(View_Mode)" },
     { "Save current file", "CTRL + S", "(Edit_Mode)" },

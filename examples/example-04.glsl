@@ -74,10 +74,6 @@ vec3 raycolor() {
     vec3 ambient = Mdiffuse(Ray.mat) * 0.1;
     color = light + ambient;
     
-    float fog_density = 5.0;
-    float fog_exp = 2.0;
-    color = ApplyFog(color, fog_density, fog_colors.rgb, fog_exp);
-    
     return color;
 }
 
@@ -85,13 +81,17 @@ vec3 raycolor() {
 // This function will get called right after
 // initializing RAY_T struct in main().
 void entry() {
+
+    FOG_COLOR = fog_colors.rgb;
+    FOG_DENSITY = 4.0;
+    FOG_EXPONENT = 3.0;
     
     vec3 rd = CameraInputRotation(Raydir());
     vec3 eye = CameraInputPosition;
     
     Raymarch(eye, rd);
     
-    Done(); // Write results to the output texture.
+    SetPixel(GetFinalColor());
 }
 
 
