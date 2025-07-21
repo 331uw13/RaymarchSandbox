@@ -51,6 +51,13 @@ By default it contains useful functions for raymarching, coloring the materials,
 
 ## Recent Updates
 
+* Mon Jul 21 2025
+```
+- Changes to fog.
+- Fixed fog blending with translucent materials.
+- Added soft shadows.
+```
+
 * Tue Jul 15 2025
 ```
 - Changed how colors are handled for rays.
