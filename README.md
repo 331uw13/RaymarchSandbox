@@ -32,7 +32,7 @@ make -j4
 
 ## About internal.glsl
 > [!NOTE]
-> Work in progress. Some functions may return unexpected results.
+> Work in progress. Some functions may change without warning.
 
 `internal.glsl` is the "library" for the Raymarch Sandbox.
 It has all the functions written to allow user to create 3D scenes.
