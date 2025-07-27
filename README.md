@@ -44,11 +44,14 @@ By default it contains useful functions for raymarching, coloring the materials,
 
 -----------------------------------
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/rmsb-intro.png?raw=true)
+
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarchsandbox_0.png?raw=true)
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/soft_shadows_and_ao.png?raw=true)
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/experiment_3.png?raw=true)
+
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/rmsb-intro.png?raw=true)
 
 
 -----------------------------------
