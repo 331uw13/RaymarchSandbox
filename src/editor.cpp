@@ -1268,6 +1268,7 @@ void Editor::init_syntax_colors() {
     m_color_map["SetPixel"] = INTERNAL;
     m_color_map["GetFinalColor"] = INTERNAL;
     m_color_map["GetShadow_LightPoint"] = INTERNAL;
+    m_color_map["AmbientOcclusion"] = INTERNAL;
     m_color_map["Material"] = INTERNAL_TYPE;
     m_color_map["SphereSDF"] = INTERNAL;
     m_color_map["BoxSDF"] = INTERNAL;
@@ -1275,6 +1276,7 @@ void Editor::init_syntax_colors() {
     m_color_map["BoxFrameSDF"] = INTERNAL;
     m_color_map["CylinderSDF"] = INTERNAL;
     m_color_map["LineSDF"] = INTERNAL;
+    m_color_map["OctahedronSDF"] = INTERNAL;
 
     m_color_map["#include"] = PREPROC;
     m_color_map["#define"] = PREPROC;

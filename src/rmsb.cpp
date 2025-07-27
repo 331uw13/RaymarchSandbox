@@ -81,6 +81,9 @@ void RMSB::init() {
     }
 
     this->translucent_step_size = 0.1;
+    this->ao_step_size = 0.01;
+    this->ao_num_samples = 32;
+    this->ao_falloff = 3.0;
     this->auto_reload = false;
     this->auto_reload_delay = 3.0;
     this->input_key = 0;
@@ -261,16 +264,19 @@ void RMSB::render_shader() {
                 shader_uniform_vec4(compute_shader, u.name.c_str(),
                         (Vector4){ u.values[0], u.values[1], u.values[2], u.values[3] });
                 break;
+
             case UNIFORM_TYPE_VALUE:
                 shader_uniform_float(compute_shader, u.name.c_str(), u.values[0]);
-                //SetShaderValue(this->shader, GetShaderLocation(this->shader, u.name.c_str()),
-                //        &u.values[0], SHADER_UNIFORM_FLOAT);
                 break;
+
             case UNIFORM_TYPE_POSITION:
                 // ... TODO
                 break;
+
+            default:break;
         }
     }
+
     shader_uniform_float(compute_shader, "time", ftime);
     shader_uniform_float(compute_shader, "FOV", this->fov);
     shader_uniform_float(compute_shader, "HIT_DISTANCE", this->hit_distance);
@@ -280,7 +286,10 @@ void RMSB::render_shader() {
     shader_uniform_float(compute_shader, "CAMERA_INPUT_YAW", this->camera.yaw);
     shader_uniform_float(compute_shader, "CAMERA_INPUT_PITCH", this->camera.pitch);
     shader_uniform_float(compute_shader, "TRANSLUCENT_STEP_SIZE", this->translucent_step_size);
-    
+    shader_uniform_float(compute_shader, "AO_STEP_SIZE", this->ao_step_size);
+    shader_uniform_int(compute_shader, "AO_NUM_SAMPLES", this->ao_num_samples);
+    shader_uniform_float(compute_shader, "AO_FALLOFF", this->ao_falloff);
+
     glUseProgram(this->compute_shader);
 	glBindImageTexture(
             8, // Binding point.

@@ -66,6 +66,7 @@ void UniformsTab::render(RMSB* rmsb) {
                 .name = name_buf,
             };
 
+            uniform.name.push_back('\0');
             ilib.add_uniform(&uniform);
 
             // Clear text input.

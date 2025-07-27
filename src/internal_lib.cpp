@@ -8,14 +8,6 @@
 #include "internal_lib.hpp"
 
 
-
-//#define UCOLOR_FUNC (u8col_t){ 70, 80, 150 }
-//#define UCOLOR_USRFUNC (u8col_t) { 150, 70, 130 }
-//#define UCOLOR_INFO (u8col_t){ 158, 80, 70 }
-//#define UCOLOR_STRUCT (u8col_t){ 130, 70, 150 }
-//#define UCOLOR_SDF (u8col_t){ 40, 150, 100 }
-
-
 static const struct u8col_t UCOLOR_INFO    = (u8col_t){ 130, 50, 60 };
 static const struct u8col_t UCOLOR_STRUCT  = (u8col_t){ 100, 70, 120 };
 static const struct u8col_t UCOLOR_USRFUNC = (u8col_t){ 100, 50, 80 };

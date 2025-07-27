@@ -1,5 +1,7 @@
-FLAGS = -ggdb -Wall -Wextra
+FLAGS = -O2 -Wall -Wextra
 CXX = g++
+
+# TODO: Add support for windows.
 
 IMGUIDIR = imgui
 TARGET_NAME = rmsb
@@ -16,12 +18,11 @@ all: $(TARGET_NAME)
 
 
 %.o: %.cpp
-	@echo "compile"
-	$(CXX) $(FLAGS) -I$(IMGUIDIR) -I$(IMGUIDIR)/backends -c $< -o $@ 
+	@$(CXX) $(FLAGS) -I$(IMGUIDIR) -I$(IMGUIDIR)/backends -c $< -o $@ && (echo "[Compiled] $<")
 
 $(TARGET_NAME): $(OBJS)
-	@echo "link"
-	$(CXX) $(OBJS) -o $@ $(LIBS) $(FLAGS)
+	@echo "Linking..."
+	@$(CXX) $(OBJS) -o $@ $(LIBS) $(FLAGS) && (echo " + Build complete."; ls -alh $(TARGET_NAME))
 
 clean:
 	rm $(OBJS) $(TARGET_NAME)

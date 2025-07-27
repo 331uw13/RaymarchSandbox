@@ -6,6 +6,12 @@
 #include "../imgui.h"
 
 
+static constexpr ImVec4 RAY_SETTN_COLOR = ImVec4(1.0, 0.5, 0.7, 1.0);
+static constexpr ImVec4 AO_SETTN_COLOR = ImVec4(0.5, 1.0, 0.5, 1.0);
+static constexpr ImVec4 TR_SETTN_COLOR = ImVec4(0.5, 0.8, 1.0, 1.0);
+
+
+
 void SettingsTab::render(RMSB* rmsb) {
 
     if(ImGui::SmallButton(" Quit ")) {
@@ -55,25 +61,62 @@ void SettingsTab::render(RMSB* rmsb) {
 
         ImGui::SliderFloat("##FIELD_OF_VIEW", 
                 &rmsb->fov, 10.0, 120.0,
-                "Field of view: %f");
+                "%f");
+        ImGui::SameLine();
+        ImGui::TextColored(RAY_SETTN_COLOR, "- Field of view");
+
 
         ImGui::SliderFloat("##HIT_DISTANCE",
                 &rmsb->hit_distance, 0.0001, 0.01,
-                "Hit distance: %f");
+                "%f");
+        ImGui::SameLine();
+        ImGui::TextColored(RAY_SETTN_COLOR, "- Hit distance");
 
-        ImGui::SliderFloat("##MAX_RAY_LENGTH",
+        ImGui::SliderFloat("##RAY_LENGTH",
                 &rmsb->max_ray_len, 10.0, 3000.0,
-                "Max ray length: %0.2f");
+                "%0.2f");
+        ImGui::SameLine();
+        ImGui::TextColored(RAY_SETTN_COLOR, "- Ray length");
 
-        ImGui::SliderFloat("##TRANSLUCENT_STEP_SIZE",
+
+
+        ImGui::SliderFloat("##AO_STEP_SIZE",
+                &rmsb->ao_step_size, 0.0008, 0.01,
+                "%f");
+        ImGui::SameLine();
+        ImGui::TextColored(AO_SETTN_COLOR, "- AO step");
+
+        ImGui::SliderInt("##AO_SAMPLES",
+                &rmsb->ao_num_samples, 8, 128,
+                "%i");
+        ImGui::SameLine();
+        ImGui::TextColored(AO_SETTN_COLOR, "- AO samples");
+
+        ImGui::SliderFloat("##AO_FALLOFF",
+                &rmsb->ao_falloff, 1.0, 5.0,
+                "%f");
+        ImGui::SameLine();
+        ImGui::TextColored(AO_SETTN_COLOR, "- AO falloff");
+
+
+
+        ImGui::SliderFloat("##TRANSLUCENT_STEP",
                 &rmsb->translucent_step_size, 0.001, 0.2,
-                "Translucent Step: %f");
+                "%f");
+        ImGui::SameLine();
+        ImGui::TextColored(TR_SETTN_COLOR, "- Translucent step");
+
+
 
         if(ImGui::SliderInt("##FPS_LIMIT",
                 &rmsb->fps_limit, 30, 1000,
-                "FPS Limit: %i")) {
+                "%i")) {
             SetTargetFPS(rmsb->fps_limit);
         }
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1.0), "- FPS limit");
+
+
 
         ImGui::Separator();
     }

@@ -293,6 +293,11 @@ void shader_util_reset_locations() {
     g_locations.clear();
 }
 
+void shader_uniform_int   (uint32_t shader, const char* name, const int&   value) {
+    glUseProgram(shader);
+    glUniform1i(get_ulocation(shader, name), value);
+}
+
 void shader_uniform_float (uint32_t shader, const char* name, const float& value) {
     glUseProgram(shader);
     glUniform1f(get_ulocation(shader, name), value);

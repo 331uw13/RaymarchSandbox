@@ -15,6 +15,9 @@ uniform float TRANSLUCENT_STEP_SIZE;
 uniform float CAMERA_INPUT_YAW;
 uniform float CAMERA_INPUT_PITCH;
 uniform vec3 CameraInputPosition;
+uniform float AO_STEP_SIZE;
+uniform int AO_NUM_SAMPLES;
+uniform float AO_FALLOFF;
 
 #define PI 3.14159
 #define PI2 (PI*2.0)
@@ -83,7 +86,7 @@ struct RAY_T
     float first_hit_dist;
     float len;    // Ray length to first ray hit (reflection doesnt use this.)
     float vm_len; // Distance from enter point to exit point.
-
+        
     Material mat; // Material which ray hit.
     Material closest_mat; // Closest material to ray.
 
@@ -222,7 +225,7 @@ by sampling the same point buf slightly different offsets.
 */
 FUNC vec3 ComputeNormal(vec3 p)
 {
-    vec2 e = vec2(0.01, 0.0);
+    vec2 e = vec2(0.0005, 0.0);
     return normalize(vec3(
         Mdistance(map(p - e.xyy)) - Mdistance(map(p + e.xyy)),
         Mdistance(map(p - e.yxy)) - Mdistance(map(p + e.yxy)),
@@ -313,8 +316,8 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
     Ray.diffuse_value = 0.0; 
     Ray.volume_color = vec3(0);
     Ray.first_hit_dist = -1;
-
     int ray_outside = 1;
+
     while(Ray.len < MAX_RAY_LENGTH) {
         if(ray_outside == 1) {
             Ray.pos = ro + rd * Ray.len;
@@ -361,7 +364,6 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
             Ray.vm_len += TRANSLUCENT_STEP_SIZE;
         }       
     }
-   
 
     Ray.solid_color += ApplyFog(raycolor(), Ray.len);
     //Ray.solid_color = ApplyFog(Ray.solid_color, Ray.len);
@@ -417,12 +419,36 @@ FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value
 FUNC_END
 
 
-FUNC float AmbientOcclusion(vec3 p, int steps)
+vec3 Hash3(vec3 x);
+
+/* -INFO
+Returns ambient occlusion value for point p (current ray position)
+*/
+FUNC float AmbientOcclusion(vec3 p, vec3 normal)
 {
-    float ao = 1.0;
+    RAY_T old_ray = Ray; // Save ray if user modifies it from map function.
+    float ao = 0.0;
 
+    for(int i = 1; i <= AO_NUM_SAMPLES; i++) {
 
+        // Get random vector and normalize it to -1.0 to 1.0.
+        // Time is added to reduce noise visible to human eye.
+        vec3 rV = Hash3(p + i + time*2) * 2.0 - 1.0;
 
+        // Decrease rV contribution to direction
+        // as the distance increases.
+        float t = float(i) / (float(AO_NUM_SAMPLES) * 2.0);
+        t = pow(t, AO_FALLOFF);
+
+        vec3 dir = (-normal) * (i * AO_STEP_SIZE) + (rV * t);
+        float dist = Mdistance(map(dir + p));
+
+        ao += max(dist, 0.0);
+    }
+
+    ao /= (float(AO_NUM_SAMPLES)*0.25);
+
+    Ray = old_ray;
     return ao;
 }
 FUNC_END
@@ -913,8 +939,24 @@ FUNC float CylinderSDF(vec3 p, float h, float r)
 }
 FUNC_END
 
-
-
+/* -INFO
+https://iquilezles.org/articles/distfunctions/
+Signed distance to octahedron.
+*/
+FUNC float OctahedronSDF(vec3 p, float s)
+{
+    p = abs(p);
+    float m = p.x+p.y+p.z-s;
+    vec3 q;
+    if( 3.0*p.x < m ) q = p.xyz;
+        else if( 3.0*p.y < m ) q = p.yzx;
+        else if( 3.0*p.z < m ) q = p.zxy;
+        else return m*0.57735027;
+    
+    float k = clamp(0.5*(q.z-q.y+s),0.0,s); 
+    return length(vec3(q.x,q.y-s+k,q.z-k)); 
+}
+FUNC_END
 
 
 

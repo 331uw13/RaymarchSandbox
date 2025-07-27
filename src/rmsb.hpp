@@ -79,6 +79,11 @@ class RMSB {
         float hit_distance;
         float max_ray_len;
         float translucent_step_size;
+        
+        // Ambient occlusion settings.
+        int   ao_num_samples;
+        float ao_step_size;
+        float ao_falloff;
             
         int monitor_width;
         int monitor_height;

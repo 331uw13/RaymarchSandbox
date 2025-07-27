@@ -1,7 +1,7 @@
 /*
-  Example #5
+  Example #6
     
-    Soft shadows
+    Soft shadows and Ambient occlusion.
     
 */
 
@@ -9,26 +9,26 @@
 // This function will map all the materials for the scene.
 Material map(vec3 p) {
     
-    p.y -= 0.8;
+    p.y -= 2.0;
     p.z -= 12.0;
     p.x += 2.0;
     
     float rb = time*0.05;
     float rb_i = 0.3;
   
-    vec3 cyl_pos = p + vec3(3.5, 3.5, 0.0);
+    vec3 cyl_pos = p + vec3(3.5, 4.0, 0.0);
     cyl_pos *= RotateM3(vec2(PI/2, 0.5));
     Material cyl = EmptyMaterial();
     Mdistance(cyl) = CylinderSDF(cyl_pos, 2.0, 1.0);
     Mdiffuse(cyl) = Palette(rb, RAINBOW_PALETTE);
     rb += rb_i;
     
-    vec3 box_pos = p + vec3(0.0, 3.0, 0.0);
+    vec3 box_pos = p + vec3(0.0, sin(time*1.3)*0.2+3.9, 0.0);
     box_pos.xz *= RotateM2(0.57);
     Material box = EmptyMaterial();
     Mdistance(box) = BoxSDF(box_pos, vec3(1.0));
-    Mdiffuse(box) = wtf_color.rgb;
-    MreflectN(box) = 1.0;
+    Mdiffuse(box) = box_color.rgb;
+    MreflectN(box) = 0;
     rb += rb_i;
    
     vec3 torus_pos = p + vec3(-3.0, 3.0, 1.0);
@@ -39,6 +39,7 @@ Material map(vec3 p) {
     Mopaque(torus) = 0;
     rb += rb_i;
     
+
     float ground_pattern = 
           floor(2*(sin(p.x*2.0)*0.5+0.5)) * 0.03
         + floor(2*(cos(p.z*2.0)*0.5+0.5)) * 0.03;
@@ -47,7 +48,7 @@ Material map(vec3 p) {
     Material ground = EmptyMaterial();
     Mdistance(ground) = BoxSDF(p+vec3(0, 5, 0), vec3(100, 0.1, 100));
     Mdiffuse(ground) = vec3(0.8, 0.7, 0.5) * ground_pattern;
-    MreflectN(ground) = 0.5;
+    MreflectN(ground) = 0;
     
     Material result = ground;
     result = MaterialMin(result, box);
@@ -60,18 +61,18 @@ Material map(vec3 p) {
 vec3 raycolor_translucent() {
 
     float density = Ray.vm_len;
-    density = 1.0 / (density*8.0);
+    density = density * density;
+    density = 1.0 / (density*10.0);
     
     return Mdiffuse(Ray.mat) * density;
 }
 
 vec3 raycolor() {
-
     vec3 color = vec3(0);
-    
     vec3 normal = ComputeNormal(Ray.pos);
+    
     float light_strength = 1.0;
-    vec3 light_pos = vec3(5.0, 6.0, -5.0 + 12);
+    vec3 light_pos = vec3(5.0, 12.0, -5.0 + 12);
     vec3 light = LightPoint(
         CameraInputPosition,
         light_pos,
@@ -84,16 +85,19 @@ vec3 raycolor() {
     vec3 ambient = Mdiffuse(Ray.mat) * 0.1;
     color = Mdiffuse(Ray.mat);
     color = light + ambient;
+    
     color *= GetShadow_LightPoint(Ray.pos, light_pos, 0.5, 0.3);
-
-    //color = ApplyFog(color, Ray.len);
+    
+    int   ao_samples = 32;
+    float ao_falloff = 3.0;
+    color *= AmbientOcclusion(Ray.pos, normal);
 
     return color;
 }
 
 
 // This function will get called right after
-// initializing RAY_T struct in mainw().
+// initializing RAY_T struct in main().
 void entry() {
     
     FOG_COLOR = fog_colors.rgb;
@@ -119,7 +123,6 @@ void entry() {
 @startup_cmd
 
 ADD COLOR fog_colors (0.289, 0.289, 0.289, 1.000);
-ADD COLOR wtf_color (0.385, 0.880, 0.074, 1.000);
-
+ADD COLOR box_color (0.275, 0.867, 0.703, 1.000);
 @end
 

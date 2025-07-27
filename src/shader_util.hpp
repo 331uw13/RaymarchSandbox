@@ -26,6 +26,7 @@ void   unload_shader(Shader* shader);
 bool is_uniform_name_valid(const char* name, size_t name_size);
 
 void shader_util_reset_locations();
+void shader_uniform_int   (uint32_t shader, const char* name, const int&   value);
 void shader_uniform_float (uint32_t shader, const char* name, const float& value);
 void shader_uniform_vec2  (uint32_t shader, const char* name, const Vector2& value);
 void shader_uniform_vec3  (uint32_t shader, const char* name, const Vector3& value);
