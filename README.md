@@ -13,6 +13,8 @@
 * First person camera support.
 * Reflective materials.
 * Translucent materials.
+* Ambient occlusion.
+* Soft shadows.
 
 -----------------------------------
 
@@ -44,12 +46,22 @@ By default it contains useful functions for raymarching, coloring the materials,
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/rmsb-intro.png?raw=true)
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/soft_shadows.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/soft_shadows_and_ao.png?raw=true)
+
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/experiment_3.png?raw=true)
 
 
 -----------------------------------
 
 ## Recent Updates
+
+* Sun Jul 27 2025
+```
+- Added ambient occlusion.
+- Added mandelbulb fractal example.
+- Updated internal.glsl
+- Small improvements.
+```
 
 * Mon Jul 21 2025
 ```
@@ -65,23 +77,5 @@ By default it contains useful functions for raymarching, coloring the materials,
 - Updated internal.glsl
 - Shader errors now report the correct row for the user
 - Changed examples
-```
-
-* Sun Jul 13 2025
-```
-- Started to implement undo for editor
-```
-
-* Thu Jul 10 2025
-```
-- Created more examples and intro.glsl
-- Updated internal.glsl
-- Fixed few bugs
-```
-
-* Tue Jul 8 2025
-```
-- Added translucent material property.
-- Small improvements
 ```
 
