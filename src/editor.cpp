@@ -146,7 +146,8 @@ void Editor::rem_data(int64_t x, int64_t y, size_t size) {
 
 void Editor::load_data(const std::string& data) {
     std::string line = "";
-
+    m_data.clear();
+    m_scroll = 0;
     for(size_t i = 0; i < data.size(); i++) {
         if(data[i] == '\n') {
             m_data.push_back(line);
@@ -157,6 +158,16 @@ void Editor::load_data(const std::string& data) {
     }
 
     reset_diff();
+}
+        
+void Editor::load_file(const std::string& filepath) {
+    char* filedata  = LoadFileText(filepath.c_str());
+    this->load_data(filedata);
+    UnloadFileText(filedata);
+}
+        
+void Editor::clear_undo_stack() {
+    m_undo_stack.clear_snapshots();
 }
 
 void Editor::save(const std::string& filepath) {

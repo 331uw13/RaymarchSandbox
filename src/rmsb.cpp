@@ -69,9 +69,11 @@ void RMSB::init() {
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
     SetExitKey(0);
    
-    this->gui.init();
+    Editor& editor = Editor::get_instance();
+    editor.init();
+    editor.load_file(this->shader_filepath);
 
-    Editor::get_instance().init();
+    this->gui.init();
 
     m_infolog_size = 0;
     m_first_shader_load = true;
@@ -109,12 +111,9 @@ void RMSB::init() {
         .move_speed = 6
     };
 
-    char* data = LoadFileText(this->shader_filepath.c_str());
-    
-    const std::string shader_code = data;
-    UnloadFileText(data);
-    
-    Editor::get_instance().load_data(shader_code);
+
+
+
 
     SetTargetFPS(this->fps_limit);
     //SetTraceLogCallback(tracelog_callback);
@@ -127,13 +126,14 @@ void RMSB::init() {
 
     // Output shader to show the results.
     this->output_shader = load_shader_from_mem(OUT_VERTEX_SHADER_CODE, OUT_FRAGMENT_SHADER_CODE);
-    
+   
+    /*
     // This is the texture everything is rendered on.
     this->render_texture = create_empty_texture(
             this->monitor_width,
             this->monitor_height,
             GL_RGBA16F);
-
+    */
 }
 
 struct texture_t RMSB::create_empty_texture(int width, int height, int format) {
@@ -156,6 +156,14 @@ struct texture_t RMSB::create_empty_texture(int width, int height, int format) {
     printf("%s: %ix%i\n", __func__, width, height);
 
     return tex;
+}
+        
+void RMSB::delete_texture(struct texture_t* tex) {
+    if(tex->id > 0) {
+        glDeleteTextures(1, &tex->id);
+        tex->id = 0;
+        printf("%s\n", __func__);
+    }
 }
 
 uint32_t RMSB::create_ssbo(int binding_point, size_t size) {
@@ -181,9 +189,7 @@ void RMSB::quit() {
         glDeleteProgram(this->compute_shader);
     }
 
-    if(this->render_texture.id > 0) {
-        glDeleteTextures(1, &this->render_texture.id);
-    }
+    this->delete_texture(&this->render_texture);
 
     this->gui.quit();
     CloseWindow();
@@ -517,8 +523,17 @@ void RMSB::reload_shader() {
     }
     else {
         loginfo(RED, "Shader failed to compile.");
-        printf("-------------------\n%s\n-----------------------\n\n",
-                code.c_str());
+        fprintf(stderr,
+                "-----------------------\n"
+                "[ERROR]: \"%s\" Failed to compile...\n"
+                "======================================================\n"
+                "%s\n"
+                "=================================================[End]\n"
+                ,
+                shader_filepath.c_str(),
+                code.c_str()
+                );
+
         error_log.get_error_position(&editor.error_row, &editor.error_column);
     }
     
@@ -539,6 +554,14 @@ void RMSB::reload_lib() {
     loginfo(PURPLE, "Internal library reloaded");
 }
 
+void RMSB::reload_state() {
+    this->reload_lib();
+    Editor::get_instance().clear_undo_stack();
+    m_first_shader_load = true;
+
+    camera.pos = (Vector3){ 0, 0, 0 };
+    camera.dir = (Vector3){ 0, 0, 0 };
+}
 
 void RMSB::loginfo(Color color, const char* text, ...) {
 #define LOGINFO_BUF_SIZE 64
@@ -579,8 +602,15 @@ void RMSB::render_infolog() {
     if(!this->show_infolog) { 
         return;
     }
-    int X = (this->gui.open ? GUI_WIDTH : 0) + 10;
+    int X = 10;
     int Y = 10;
+
+    if(this->gui.open) {
+        X += GUI_WIDTH;
+    }
+    if(FileBrowser::Instance().is_open()) {
+        X += FILEBROWSER_WIDTH;
+    }
 
 
     struct infotext_t* info = NULL;

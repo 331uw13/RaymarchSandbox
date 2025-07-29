@@ -57,6 +57,7 @@ class Editor {
         void clear();
         void save(const std::string& filepath);
         void load_data(const std::string& data);
+        void load_file(const std::string& path);
 
         void undo();
 
@@ -85,9 +86,10 @@ class Editor {
         void reset_diff();
         void update_diff();
         
-        Font font;
-       
+        Font font; 
         float undo_save_time;
+
+        void clear_undo_stack();
 
     private:
         

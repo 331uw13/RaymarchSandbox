@@ -18,9 +18,10 @@ void SettingsTab::render(RMSB* rmsb) {
        
         Editor& editor = Editor::get_instance();
         if(editor.content_changed) {
+            // ask_question() will return answer index.
             int answer = rmsb->gui.ask_question(
                     TextFormat("Warning: shader \"%s\" is not saved.", rmsb->shader_filepath.c_str()),
-                    { "Save and quit.", "Quit anyway!" });
+                    /*Answers:*/{ "Save and quit.", "Quit anyway!" });
 
             if(answer == 0) {
                 editor.save(rmsb->shader_filepath.c_str());
@@ -29,13 +30,23 @@ void SettingsTab::render(RMSB* rmsb) {
         
         rmsb->running = false;
     }
+    
     ImGui::SameLine();
-    ImGui::Text("File: %s", rmsb->shader_filepath.c_str());
+    ImGui::TextColored(ImVec4(0.3, 0.7, 0.4, 1.0), "- %s", rmsb->shader_filepath.c_str());
 
     ImGui::Separator();
 
     if(ImGui::Button("Reload Shader")) {
         rmsb->reload_shader();
+    }
+
+    ImGui::SameLine();
+    if(ImGui::Button("Open Shader")) {
+        FileBrowser& filebrowser = FileBrowser::Instance();
+        filebrowser.open(".", "Open New Shader", ".glsl");
+        filebrowser.register_task_callback(
+                FileBrowserCallbacks::shader_selected
+                );
     }
 
     if(ImGui::Button("Reload Lib")) {
@@ -115,8 +126,6 @@ void SettingsTab::render(RMSB* rmsb) {
         }
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1.0), "- FPS limit");
-
-
 
         ImGui::Separator();
     }

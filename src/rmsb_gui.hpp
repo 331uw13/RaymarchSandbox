@@ -1,9 +1,11 @@
 #ifndef RAYMARCH_SANDBOX_GUI_HPP
 #define RAYMARCH_SANDBOX_GUI_HPP
 
+
 #define GUI_WIDTH 430
 #define GUI_HEIGHT 600
 #define FUNCTIONS_VIEW_WIDTH 750
+#define FILEBROWSER_WIDTH 350
 
 #include <initializer_list>
 #include <string_view>

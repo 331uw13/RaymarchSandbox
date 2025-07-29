@@ -8,6 +8,8 @@
 #include "internal_lib.hpp"
 #include "error_log.hpp"
 #include "editor.hpp"
+#include "filebrowser.hpp"
+
 
 #define GLSL_VERSION "#version 430\n"
 
@@ -19,6 +21,9 @@
 
 #define INFO_ARRAY_MAX_SIZE 32
 
+
+// Info text is used to give user any feedback of ..really anything happening.
+// from saving a file to glsl errors. It has a setting to be disabled.
 struct infotext_t {
     std::string data;
     Color color;
@@ -35,11 +40,14 @@ struct camera_t {
     float move_speed;
 };
 
+// Different mode allows to have same keybind but different action
+// depending on what mode is enabled.
 enum Mode {
     VIEW_MODE,
     EDIT_MODE
 };
 
+// TODO: Rename ??????
 struct texture_t {
     uint32_t id;
     int format;
@@ -54,12 +62,12 @@ class RMSB {
     public:
         bool running;
         
-        Shader output_shader;
-        uint32_t compute_shader;
-        struct texture_t render_texture;
-        //uint32_t render_texture;
+        Shader           output_shader;  // This shader is for drawing the texture compute shader created.
+        uint32_t         compute_shader; // This shader is the user's controlled shader.
+        struct texture_t render_texture; // aka Output texture (TODO: Rename this?).
 
-        bool show_fps;
+
+        // TODO: Add settings struct to make this more organized.
 
         std::string shader_filepath;
 
@@ -72,6 +80,7 @@ class RMSB {
         bool show_infolog;
         bool allow_camera_input;
         int fps_limit;
+        bool show_fps;
 
         float file_read_timer;
     
@@ -88,20 +97,34 @@ class RMSB {
         int monitor_width;
         int monitor_height;
 
-        RMSBGui gui;
+        RMSBGui      gui;
+
         struct camera_t camera;
 
         void init();
         void quit();
         void update();
 
-        uint32_t create_ssbo(int binding_point, size_t size);
+        // TODO: Add support for reading values back.
+        // this is here because of it. (Not implemented yet).
+        uint32_t         create_ssbo(int binding_point, size_t size);
+        
         struct texture_t create_empty_texture(int width, int height, int format);
+        void             delete_texture(struct texture_t* tex);
 
         void render_shader();
+        
         void reload_shader();
-
         void reload_lib();
+        
+        // Reload shader,
+        // Reload internal lib,
+        // Clear custom uniform inputs.
+        // Clear undo stack.
+        // Set m_first_shader_loaded = true
+        // Reset camera.
+        void reload_state();
+
 
         void loginfo(Color color, const char* text, ...);
         void render_infolog();
@@ -113,10 +136,15 @@ class RMSB {
 
     private:
 
-        bool m_first_shader_load;
         Vector2 m_mouse_pos;
         struct infotext_t m_infolog[INFO_ARRAY_MAX_SIZE];
         size_t m_infolog_size;
+
+        // When this values is 'true'
+        // and RMSB::reload_shader is called,
+        // the custom uniform settings(aka startup cmd) is parsed
+        // from the shader file.
+        bool m_first_shader_load;
 
         // On first load need to add the uniforms that are in.
         // @startup_command .... @end  region.
