@@ -47,6 +47,25 @@ By default it contains useful functions for raymarching, coloring the materials,
 
 -----------------------------------
 
+## Configuration file (rmsb.ini)
+```ini
+[render_settings]
+fps_limit = 300
+fov = 60.0
+hit_distance = 0.001
+mx_ray_length = 300.0
+ao_step = 0.01
+ao_samples = 32
+ao_falloff = 3.0
+translucent_step = 0.1
+
+render_resolution = FULL
+custom_render_resolution_X = 0
+custom_render_resolution_Y = 0
+```
+* `render_resolution` Options: FULL, HALF or CUSTOM
+
+-----------------------------------
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarchsandbox_0.png?raw=true)
 
@@ -60,6 +79,13 @@ By default it contains useful functions for raymarching, coloring the materials,
 -----------------------------------
 
 ## Recent Updates
+
+* Tue Jul 29 2025
+```
+- Added file browser.
+- Shaders can be opened with file browser now.
+- Added config file using: https://github.com/benhoyt/inih
+```
 
 * Sun Jul 27 2025
 ```
