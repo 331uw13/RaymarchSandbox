@@ -16,7 +16,7 @@
     
     - Added uniforms from "Uniform Input" tab
       are available in the code with the same name
-      after reloading.
+      after reloading the shader.
  
     Report bugs to the project github page or dm me in discord: _331uw13
 */
@@ -158,12 +158,12 @@ void entry() {
 // when the shader is compiled the first time.
 // They can be then modified at run time
 // from "Input" tab. Or add new ones from the gui.
-@startup_cmd
+@_UNIFORM_METADATA
 
-ADD COLOR test_color (0.948, 0.004, 0.277, 1.000);
-ADD COLOR light_color (0.560, 1.000, 0.108, 0.882);
-ADD COLOR fog_color (0.944, 0.320, 0.254, 0.000);
-ADD COLOR transparent_color (0.145, 0.723, 0.660, 1.000);
+//ADD COLOR test_color (0.948, 0.004, 0.277, 1.000);
+//ADD COLOR light_color (0.560, 1.000, 0.108, 0.882);
+//ADD COLOR fog_color (0.944, 0.320, 0.254, 0.000);
+//ADD COLOR transparent_color (0.145, 0.723, 0.660, 1.000);
 
-@end
+@_UNIFORM_METADATA_END
 

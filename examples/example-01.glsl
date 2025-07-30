@@ -2,6 +2,9 @@
   Example #1
     
     Hello Sphere.
+
+
+Note: Try changing values from the "Uniform Input" tab.
 */
 
 
@@ -10,7 +13,6 @@ Material map(vec3 p) {
     
     p.z -= 5.0;
     
-    // Try changing the sphere color from the "Uniform Input" tab.
     Material sphere = EmptyMaterial();
     Mdistance(sphere) = SphereSDF(p, 1.0);
     Mdiffuse(sphere) = sphere_color.rgb;
@@ -26,10 +28,12 @@ vec3 raycolor() {
     
     vec3 normal = ComputeNormal(Ray.pos);
     float light_strength = 2.0;
-    vec3 light = LightDirectional(
+    vec3 light_color = vec3(1.0, 0.9, 0.8);
+    vec3 light = LightPoint(
         CameraInputPosition,
-        vec3(8.0, 10.0, -3.0),
-        vec3(1.0, 0.9, 0.8),
+        light_position,
+        light_color,
+        10.0, 1.0,
         normal,
         Ray.mat
     ) * light_strength;
@@ -59,9 +63,8 @@ void entry() {
 // when the shader is compiled the first time.
 // They can be then modified at run time
 // from "Input" tab. Or add new ones from the gui.
-@startup_cmd
+@_UNIFORM_METADATA
+    "sphere_color"(RGBA)[0.144129, 0.583222, 0.835294, 1.000000]
+    "light_position"(XYZ)[1.046445, 2.394305, 2.358320, 1.000000]
 
-ADD COLOR sphere_color (0.928, 0.583, 0.387, 1.000);
-
-@end
-
+@_UNIFORM_METADATA_END

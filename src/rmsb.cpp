@@ -12,6 +12,7 @@
 #include "rmsb.hpp"
 #include "shader_util.hpp"
 #include "preproc.hpp"
+#include "uniform_metadata.hpp"
 
 #include <rlgl.h>
 
@@ -77,6 +78,7 @@ void RMSB::init() {
 
     m_infolog_size = 0;
     m_first_shader_load = true;
+    m_pos_uniform_ptr = NULL;
 
     for(size_t i = 0; i < INFO_ARRAY_MAX_SIZE; i++) {
         m_infolog[i].enabled = 0;
@@ -102,9 +104,8 @@ void RMSB::init() {
     this->hit_distance = 0.001000;
     this->max_ray_len = 1000.0;
     this->allow_camera_input = false; 
-    this->camera = (struct camera_t) {
+    this->ray_camera = (struct camera_t) {
         .pos = (Vector3){ 0, 0, 0 },
-        .dir = (Vector3){ 0, 0, 0 },
         .yaw = 0,
         .pitch = 0,
         .sensetivity = 0.065,
@@ -200,47 +201,47 @@ void RMSB::update_camera() {
     const float dt = GetFrameTime();
     Vector2 md = GetMouseDelta();
 
-    this->camera.yaw -= (md.x * this->camera.sensetivity) * (M_PI/180.0);
-    this->camera.pitch += (md.y * this->camera.sensetivity) * (M_PI/180.0);
+    this->ray_camera.yaw -= (md.x * this->ray_camera.sensetivity) * (M_PI/180.0);
+    this->ray_camera.pitch += (md.y * this->ray_camera.sensetivity) * (M_PI/180.0);
 
     Vector3 cam_dir = (Vector3) {
-        (float)cos(this->camera.yaw+(M_PI/2)) * cos(-this->camera.pitch),
-        sin(-this->camera.pitch),
-        (float)sin(this->camera.yaw+(M_PI/2)) * cos(-this->camera.pitch)
+        (float)cos(this->ray_camera.yaw+(M_PI/2)) * cos(-this->ray_camera.pitch),
+        sin(-this->ray_camera.pitch),
+        (float)sin(this->ray_camera.yaw+(M_PI/2)) * cos(-this->ray_camera.pitch)
     };
 
-    const float speed = dt * this->camera.move_speed;
+    const float speed = dt * this->ray_camera.move_speed;
 
     if(IsKeyDown(KEY_W)) {
-        this->camera.pos.x += cam_dir.x * speed;
-        this->camera.pos.y += cam_dir.y * speed;
-        this->camera.pos.z += cam_dir.z * speed;
+        this->ray_camera.pos.x += cam_dir.x * speed;
+        this->ray_camera.pos.y += cam_dir.y * speed;
+        this->ray_camera.pos.z += cam_dir.z * speed;
     }
     else
     if(IsKeyDown(KEY_S)) {
-        this->camera.pos.x -= cam_dir.x * speed;
-        this->camera.pos.y -= cam_dir.y * speed;
-        this->camera.pos.z -= cam_dir.z * speed;
+        this->ray_camera.pos.x -= cam_dir.x * speed;
+        this->ray_camera.pos.y -= cam_dir.y * speed;
+        this->ray_camera.pos.z -= cam_dir.z * speed;
     }
 
 
     Vector3 right = Vector3CrossProduct(cam_dir, (Vector3){ 0, 1, 0 });
 
     if(IsKeyDown(KEY_A)) {
-        this->camera.pos.x += right.x * speed;
-        this->camera.pos.z += right.z * speed;
+        this->ray_camera.pos.x += right.x * speed;
+        this->ray_camera.pos.z += right.z * speed;
     }
     else
     if(IsKeyDown(KEY_D)) {
-        this->camera.pos.x -= right.x * speed;
-        this->camera.pos.z -= right.z * speed;
+        this->ray_camera.pos.x -= right.x * speed;
+        this->ray_camera.pos.z -= right.z * speed;
     }
 
     if(IsKeyDown(KEY_SPACE)) {
-        this->camera.pos.y += speed;
+        this->ray_camera.pos.y += speed;
     }
     if(IsKeyDown(KEY_LEFT_SHIFT)) {
-        this->camera.pos.y -= speed;
+        this->ray_camera.pos.y -= speed;
     }
 }
 
@@ -263,22 +264,25 @@ void RMSB::render_shader() {
 
     
     InternalLib& ilib = InternalLib::get_instance();
-    for(struct uniform_t u : ilib.uniforms) {
+    for(Uniform u : ilib.uniforms) {
 
         switch(u.type) {
-            case UNIFORM_TYPE_COLOR:
+            case UniformDataType::RGBA:
                 shader_uniform_vec4(compute_shader, u.name.c_str(),
                         (Vector4){ u.values[0], u.values[1], u.values[2], u.values[3] });
                 break;
 
-            case UNIFORM_TYPE_VALUE:
+            case UniformDataType::XYZ:
+                shader_uniform_vec3(compute_shader, u.name.c_str(),
+                        (Vector3){ -u.values[0], u.values[1], u.values[2] });
+                break;
+
+            case UniformDataType::SINGLE:
                 shader_uniform_float(compute_shader, u.name.c_str(), u.values[0]);
                 break;
 
-            case UNIFORM_TYPE_POSITION:
-                // ... TODO
-                break;
-
+            case UniformDataType::INVALID:break;
+            case UniformDataType::NUM_TYPES:break;
             default:break;
         }
     }
@@ -288,9 +292,9 @@ void RMSB::render_shader() {
     shader_uniform_float(compute_shader, "HIT_DISTANCE", this->hit_distance);
     shader_uniform_float(compute_shader, "MAX_RAY_LENGTH", this->max_ray_len);
     shader_uniform_vec2(compute_shader, "monitor_size", monitor_size);
-    shader_uniform_vec3(compute_shader, "CameraInputPosition", this->camera.pos);
-    shader_uniform_float(compute_shader, "CAMERA_INPUT_YAW", this->camera.yaw);
-    shader_uniform_float(compute_shader, "CAMERA_INPUT_PITCH", this->camera.pitch);
+    shader_uniform_vec3(compute_shader, "CameraInputPosition", this->ray_camera.pos);
+    shader_uniform_float(compute_shader, "CAMERA_INPUT_YAW", this->ray_camera.yaw);
+    shader_uniform_float(compute_shader, "CAMERA_INPUT_PITCH", this->ray_camera.pitch);
     shader_uniform_float(compute_shader, "TRANSLUCENT_STEP_SIZE", this->translucent_step_size);
     shader_uniform_float(compute_shader, "AO_STEP_SIZE", this->ao_step_size);
     shader_uniform_int(compute_shader, "AO_NUM_SAMPLES", this->ao_num_samples);
@@ -322,163 +326,6 @@ void RMSB::render_shader() {
     EndShaderMode();
 }
 
-void RMSB::get_cmdline_value(const std::string& code_line, float values[4]) {
-    
-    size_t array_start = code_line.find("(");
-    size_t array_end = code_line.find(")");
-
-    if((array_start == std::string::npos)
-    || (array_end == std::string::npos)) {
-        return;
-    }
-
-
-    char buf[64] = { 0 };
-    size_t buf_i = 0;
-    size_t values_i = 0;
-    //printf("\n");
-
-    for(size_t i = array_start+1; i < array_end+1; i++) {
-        char c = code_line[i];
-      
-        if((c == ',') || (c == ')')) {
-            // The value is written to buf,
-            // convert to float and move it to values array.
-            values[values_i] = atof(buf);
-            memset(buf, 0, buf_i);
-            buf_i = 0;
-            values_i++;
-
-            continue;
-        } 
-        
-        if((c >= '0' && c <= '9') || (c == '.')) {
-            buf[buf_i] = c;
-            buf_i++;
-            if(buf_i >= 64) {
-                fprintf(stderr, "'%s': Invalid array for '%s'\n",
-                        __func__, code_line.c_str());
-                return;
-            }
-        }
-       
-    }
-}
-
-void RMSB::process_shader_startup_cmd_line(const std::string& code_line) {
-
-    if(code_line.empty()) {
-        return;
-    }
-
-    if(!code_line.find("ADD:")) {
-        fprintf(stderr, "'%s': \"%s\" not valid startup command.\n",
-                __func__, code_line.c_str());
-        return;
-    }
-
-    // TODO: Make this safer.
-    //
-#define COMMAND_ARGS_SIZE 16 
-    std::string part = "";
-    std::string args[COMMAND_ARGS_SIZE];
-    size_t num_args = 0;
-
-    // Read into 'parts'
-    // and when <space char> is found. move it into args[num_args].
-    for(size_t i = 0; i < code_line.size(); i++) {
-        char c = code_line[i];
-
-        bool line_end = (c == ';');
-
-        if((c == 0x20) || line_end) {
-            args[num_args] = part;
-            num_args++;
-            part.clear();
-            continue;
-        }
-
-        part += c;
-    }
-
-
-    // TODO: Use hash for string and switch statement if adding alot of types.
-
-    std::string* type = &args[1];
-    std::string* name = &args[2];
-
-    //printf("NAME:'%s'\n", name->c_str());
-
-    struct uniform_t uniform = {
-        .type = -1,
-        .location = 0,
-        .values = { 0.0, 0.0, 0.0, 0.0 },
-        .name = *name
-    };
-
-    get_cmdline_value(code_line, uniform.values);
-
-    if(*type == "COLOR") {
-        uniform.type = UNIFORM_TYPE_COLOR;
-    }
-    else
-    if(*type == "VALUE") {
-        uniform.type = UNIFORM_TYPE_VALUE;
-    }
-    else
-    if(*type == "POSITION") {
-        uniform.type = UNIFORM_TYPE_POSITION; 
-    }
-
-
-    InternalLib::get_instance().add_uniform(&uniform);
-
-}
-
-void RMSB::run_shader_startup_cmd(const std::string* shader_code) {
-    size_t begin_index = shader_code->find(STARTUP_CMD_BEGIN_TAG);
-    size_t end_index = shader_code->find(STARTUP_CMD_END_TAG);
-
-    if((begin_index == std::string::npos) || (end_index == std::string::npos)) {
-        printf("'%s': No valid startup command region found.\n", __func__);
-        return;
-    }
-
-    begin_index += strlen(STARTUP_CMD_BEGIN_TAG)+1;
-    std::string line = "";
-
-    for(size_t i = begin_index; i < end_index; i++) {
-        char c = (*shader_code)[i];
-        if(c == '\n') {
-            
-            process_shader_startup_cmd_line(line);
-
-            line.clear();
-            continue;
-        }
-
-        line += c;
-    }
-}
-
-void RMSB::remove_startup_cmd_blocks(std::string* shader_code) {
-    size_t begin_index = shader_code->find(STARTUP_CMD_BEGIN_TAG);
-    size_t end_index = shader_code->find(STARTUP_CMD_END_TAG);
-
-    if((begin_index == std::string::npos) || (end_index == std::string::npos)) {
-        printf("'%s': No valid startup command region found.\n", __func__);
-        return;
-    }
-
-    if(begin_index > 0) {
-        begin_index--;
-    }
-
-    shader_code->erase(begin_index, end_index);
-}
-
-
-
 void RMSB::reload_shader() {
 
     // Reset shader uniform locations.
@@ -492,12 +339,11 @@ void RMSB::reload_shader() {
     error_log.clear();
    
 
-    // Add user specified uniforms from the file
     if(m_first_shader_load) {
-        run_shader_startup_cmd(&shader_code);
+        UniformMetadata::read(shader_code);
     }
-
-    remove_startup_cmd_blocks(&shader_code);
+    
+    UniformMetadata::remove(&shader_code);
 
 
     // Merge user shader code and internal lib.
@@ -523,6 +369,7 @@ void RMSB::reload_shader() {
     }
     else {
         loginfo(RED, "Shader failed to compile.");
+        /*
         fprintf(stderr,
                 "-----------------------\n"
                 "[ERROR]: \"%s\" Failed to compile...\n"
@@ -532,7 +379,7 @@ void RMSB::reload_shader() {
                 ,
                 shader_filepath.c_str(),
                 code.c_str()
-                );
+                );*/
 
         error_log.get_error_position(&editor.error_row, &editor.error_column);
     }
@@ -559,9 +406,9 @@ void RMSB::reload_state() {
     Editor::get_instance().clear_undo_stack();
     m_first_shader_load = true;
 
-    camera.pos = (Vector3){ 0, 0, 0 };
-    camera.dir = (Vector3){ 0, 0, 0 };
+    this->ray_camera.pos = (Vector3){ 0, 0, 0 };
 }
+
 
 void RMSB::loginfo(Color color, const char* text, ...) {
 #define LOGINFO_BUF_SIZE 64
@@ -633,6 +480,162 @@ void RMSB::render_infolog() {
             info->enabled = 0;
         }
     }
+}
+
+void RMSB::render_3d() {
+
+    this->raster_camera.position = this->ray_camera.pos;
+    this->raster_camera.position.x = -this->raster_camera.position.x;
+    this->raster_camera.up = (Vector3){ 0, 1, 0 };
+    this->raster_camera.fovy = this->fov;
+    this->raster_camera.projection = CAMERA_PERSPECTIVE;
+
+    float y = this->ray_camera.yaw;
+    float p = -this->ray_camera.pitch;
+
+    Vector3 dir = (Vector3) {
+        cos(p) * sin(y),
+        sin(p),
+        cos(p) * cos(y)
+    };
+
+    this->raster_camera.target = Vector3Add(this->raster_camera.position, dir);
+   
+
+    // For test render a sphere.
+    BeginMode3D(this->raster_camera);
+
+    if(m_pos_uniform_ptr) {
+        edit_position_uniform();
+    }
+
+    EndMode3D();
+}
+        
+void RMSB::edit_position_uniform() {
+    if(!m_pos_uniform_ptr) { return; }
+
+    constexpr float S = 1.0; // How far away the drag points are from origin.
+    constexpr float   active_hit_radius = 1.0;
+    float hit_radius = 0.3; // Default bounding sphere radius for ray.
+    
+    Vector3 origin = (Vector3) {
+        m_pos_uniform_ptr->values[0], 
+        m_pos_uniform_ptr->values[1], 
+        m_pos_uniform_ptr->values[2]
+    };
+
+    constexpr uint32_t X_axis_i = 0;
+    constexpr uint32_t Y_axis_i = 1;
+    constexpr uint32_t Z_axis_i = 2;
+    
+    int32_t hit_axis_i = -1;
+    
+    const Vector3 axis_points[3] = {
+        (Vector3) {  // X
+            origin.x + S,
+            origin.y,
+            origin.z
+        },
+        (Vector3) {  // Y
+            origin.x,
+            origin.y + S,
+            origin.z
+        },
+        (Vector3) {  // Z
+            origin.x,
+            origin.y,
+            origin.z + S
+        },
+    };
+
+    Vector3 hit_pos;
+
+
+    if(IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        const Ray ray = GetScreenToWorldRay(GetMousePosition(), this->raster_camera);
+
+        if(m_user_hold_uniform_pos) {
+            hit_radius = active_hit_radius;
+            RayCollision collision 
+                = GetRayCollisionSphere(
+                    ray,
+                    axis_points[m_user_hold_axis_i],
+                    hit_radius);
+
+            if(collision.hit) {
+                hit_pos = collision.point;
+                hit_axis_i = m_user_hold_axis_i;
+            }
+        }
+        else {
+            for(uint32_t i = 0; i < 3; i++) {
+                RayCollision collision = GetRayCollisionSphere(ray, axis_points[i], hit_radius);
+                if(collision.hit) {
+                    hit_axis_i = i;
+                    hit_pos = collision.point;
+                    m_user_hold_uniform_pos = true;
+                    m_user_hold_axis_i = i;
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        m_user_hold_uniform_pos = false;
+    }
+
+    DrawSphere(origin, 0.05, WHITE);
+    DrawSphere(axis_points[X_axis_i], 0.07, RED);
+    DrawSphere(axis_points[Y_axis_i], 0.07, GREEN);
+    DrawSphere(axis_points[Z_axis_i], 0.07, BLUE);
+  
+    constexpr float active_r = 0.2;
+    constexpr float inactive_r = 0.125;
+
+    DrawSphere(axis_points[X_axis_i],
+            (hit_axis_i==X_axis_i) ? active_r : inactive_r, (Color){ 200, 30, 30, 100 });
+
+    DrawSphere(axis_points[Y_axis_i],
+            (hit_axis_i==Y_axis_i) ? active_r : inactive_r, (Color){ 30, 200, 30, 100 });
+    
+    DrawSphere(axis_points[Z_axis_i],
+            (hit_axis_i==Z_axis_i) ? active_r : inactive_r, (Color){ 30, 30, 200, 100 });
+
+    DrawCylinderEx(
+            origin,
+            axis_points[X_axis_i],
+            0.05, 0.1, 4, (Color){ 200, 30, 30, 200 });
+
+    DrawCylinderEx(
+            origin,
+            axis_points[Y_axis_i],
+            0.05, 0.1, 4, (Color){ 30, 200, 30, 200 });
+    
+    DrawCylinderEx(
+            origin,
+            axis_points[Z_axis_i],
+            0.05, 0.1, 4, (Color){ 30, 30, 200, 200 });
+
+
+    if(hit_axis_i >= 0) {
+        if(hit_axis_i == X_axis_i) {
+            m_pos_uniform_ptr->values[0] = hit_pos.x - S/2;
+        }
+        else
+        if(hit_axis_i == Y_axis_i) {
+            m_pos_uniform_ptr->values[1] = hit_pos.y - S;
+        }
+        else
+        if(hit_axis_i == Z_axis_i) {
+            m_pos_uniform_ptr->values[2] = hit_pos.z - S/2;
+        }
+    }
+
+}
+
+void RMSB::set_position_uniform_ptr(Uniform* ptr) {
+    m_pos_uniform_ptr = ptr;
 }
 
 

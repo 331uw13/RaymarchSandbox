@@ -2,7 +2,9 @@
   Example #5
     
     More effects with noise functions.
-    
+   
+          
+Note: Try changing the colors from the "Uniform Input" tab.
 */
 
 
@@ -102,9 +104,6 @@ void entry() {
 // when the shader is compiled the first time.
 // They can be then modified at run time
 // from "Input" tab. Or add new ones from the gui.
-@startup_cmd
-
-ADD COLOR fog_colors (0.106, 0.124, 0.118, 1.000);
-
-@end
-
+@_UNIFORM_METADATA
+    "fog_colors"(RGBA)[0.106, 0.124, 0.118, 1.000]
+@_UNIFORM_METADATA_END

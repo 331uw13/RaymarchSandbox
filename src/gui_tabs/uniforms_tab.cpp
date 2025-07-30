@@ -5,27 +5,46 @@
 #include "../imgui.h"
 
 
-void UniformsTab::edit_uniform(struct uniform_t* uniform) {
+void UniformsTab::edit_uniform(RMSB* rmsb, Uniform* uniform) {
     
     switch(uniform->type) {
-        case UNIFORM_TYPE_COLOR:
+        case UniformDataType::RGBA:
             {
                 ImGui::ColorPicker4("##UNIFORM_COLOR", uniform->values);
             }
             break;
 
-        case UNIFORM_TYPE_VALUE:
+        case UniformDataType::SINGLE:
             {
                 ImGui::Text("TODO: Add adjustable min and max.");
                 ImGui::SliderFloat("##UNIFORM_VALUE", &uniform->values[0], 0.0, 1.0, "%f");
             }
             break;
 
-        case UNIFORM_TYPE_POSITION:
+        case UniformDataType::XYZ:
             {
-                ImGui::Text("Not implemented yet.");
+                ImGui::TextColored(ImVec4(1.0, 0.5, 0.5, 1.0), "X=%0.3f", 
+                        uniform->values[0]);
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.5, 1.0, 0.5, 1.0), "Y=%0.3f", 
+                        uniform->values[1]);
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.5, 0.5, 1.0, 1.0), "Z=%0.3f", 
+                        uniform->values[2]);
+                if(ImGui::Button("Edit position")) {
+                    rmsb->set_position_uniform_ptr(uniform);
+                }
+                ImGui::SameLine();
+                if(ImGui::Button("done")) {
+                    rmsb->set_position_uniform_ptr(NULL);
+                }
             }
             break;
+
+
+        case UniformDataType::INVALID:break;
+        case UniformDataType::NUM_TYPES:break;
+        default:break;
     }
 
 }
@@ -50,17 +69,19 @@ void UniformsTab::render(RMSB* rmsb) {
 
     ImGui::Text("Type:");
     ImGui::SameLine();
-    ImGui::Combo("##UNIFORM_FUNC_TYPE", &selected_index, 
-            UNIFORM_TYPES_STR, NUM_UNIFORM_TYPES);
+    ImGui::Combo("##UNIFORM_TYPE", &selected_index, 
+            UNIFORM_DATA_TYPES_STR, UniformDataType::NUM_TYPES);
 
     ImGui::SameLine();
     if(ImGui::Button("Add")) {
         size_t name_size = strlen(name_buf);
 
+        // Pre-check for invalid naming, this will avoid
+        // removing the uniform and fixing the name if its bad for glsl.
         if(is_uniform_name_valid(name_buf, name_size)) {
            
-            struct uniform_t uniform = (struct uniform_t) {
-                .type = UNIFORM_TYPES[selected_index],
+            Uniform uniform = (Uniform) {
+                .type = UNIFORM_DATA_TYPES[selected_index],
                 .location = 0,
                 .values = { 0, 0, 0, 1.0 },
                 .name = name_buf,
@@ -81,7 +102,7 @@ void UniformsTab::render(RMSB* rmsb) {
 
     size_t id_counter = 0;
 
-    std::list<struct uniform_t>::iterator uniform = ilib.uniforms.begin();
+    std::list<Uniform>::iterator uniform = ilib.uniforms.begin();
     while(uniform != ilib.uniforms.end()) {
         ImGui::PushID(id_counter);
        
@@ -97,8 +118,8 @@ void UniformsTab::render(RMSB* rmsb) {
         ImGui::TextColored(ImVec4(0.7, 0.6, 0.5, 1.0), uniform->name.c_str());
         ImGui::SameLine();
 
-        if(ImGui::TreeNode(UNIFORM_TYPES_STR[uniform->type])) {
-            edit_uniform(&(*uniform));
+        if(ImGui::TreeNode(UNIFORM_DATA_TYPES_STR[uniform->type])) {
+            edit_uniform(rmsb, &(*uniform));
             ImGui::Separator();
             ImGui::TreePop();
         }

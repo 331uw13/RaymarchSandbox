@@ -53,21 +53,20 @@ class Editor {
         bool open;
         char char_input;
 
-
-        void clear();
+        void clear(); // TODO: Rename to: "clear_content"
         void save(const std::string& filepath);
         void load_data(const std::string& data);
         void load_file(const std::string& path);
 
         void undo();
+        void unselect();
 
         std::string get_content();
-        bool content_changed;
+        bool        content_changed; // TODO: Rename to "unsaved_changes"
 
         bool has_focus;
         bool mouse_hovered;
 
-        void unselect();
 
 
         int64_t error_row;
@@ -90,6 +89,8 @@ class Editor {
         float undo_save_time;
 
         void clear_undo_stack();
+        
+        std::string clipboard;
 
     private:
         
@@ -109,7 +110,6 @@ class Editor {
             bool active;
         } m_select;
 
-        std::string m_clipboard;
         
         std::map<std::string_view, int> m_color_map;
         Color get_keyword_color(char* buffer);

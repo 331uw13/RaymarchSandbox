@@ -183,7 +183,7 @@ void InternalLib::add_document(const char* code, const char* description, struct
     }
 
 
-    struct document_t document = (struct document_t) {
+    Document document = (Document) {
         .code = code,
         .desc = description,
         .name = "",
@@ -225,7 +225,7 @@ void InternalLib::add_info(const char* title, const char* description, struct u8
         return;
     }
 
-    struct document_t document = (struct document_t) {
+    Document document = (Document) {
         .code = "<No source has been set>",
         .desc = description,
         .name = title,
@@ -242,15 +242,24 @@ const std::string InternalLib::get_source() {
 }
         
 
-std::string InternalLib::get_uniform_code_line(struct uniform_t* u) {
+std::string InternalLib::get_uniform_code_line(Uniform* u) {
     std::string code = "uniform ";
-    code += UNIFORM_DATA_TYPES_STR[u->type];
-    code += " " + u->name + ";\n";
+    code += UNIFORM_GLSL_TYPES_STR[u->type];
+    code += " " + u->name;
+
+    if(code.back() == '\0') {
+        code.replace(code.size()-1, 1, ";");
+    }
+    else {
+        code.push_back(';');
+    }
+
+    printf("%s\n", code.c_str());
 
     return code;
 }
 
-void InternalLib::remove_uniform(struct uniform_t* u) {
+void InternalLib::remove_uniform(Uniform* u) {
     std::string code = get_uniform_code_line(u);
 
     size_t index = this->source.find(code);
@@ -263,11 +272,10 @@ void InternalLib::remove_uniform(struct uniform_t* u) {
     this->source.erase(index, code.size());
 }
 
-void InternalLib::add_uniform(struct uniform_t* u) {
+void InternalLib::add_uniform(Uniform* u) {
     this->uniforms.push_back(*u);
 
     std::string linebuf = "";
-
     int64_t found_index = -1;
 
     for(size_t i = 0; i < this->source.size(); i++) {

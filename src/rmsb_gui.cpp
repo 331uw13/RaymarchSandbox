@@ -178,7 +178,7 @@ void RMSBGui::render(RMSB* rmsb) {
 
         //colors[ImGuiCol_Header] = ImVec4(0.57f, 0.28f, 0.22f, 0.31f);
 
-        for(struct document_t document : ilib.documents) {
+        for(Document document : ilib.documents) {
 
             colors[ImGuiCol_Header] = ImVec4(
                     (float)document.color.red / 255.0,
@@ -187,6 +187,7 @@ void RMSBGui::render(RMSB* rmsb) {
                     1.0
                     );
 
+
             if(ImGui::CollapsingHeader(document.name.c_str())) {
                 ImGui::PushID(counter);
 
@@ -194,8 +195,9 @@ void RMSBGui::render(RMSB* rmsb) {
                 if(!document.link.empty()) {
                     ImGui::TextLink(document.link.c_str());
                 }
-                if(ImGui::TreeNodeEx("Source", ImGuiTreeNodeFlags_DefaultOpen)) {
 
+                ImGui::SameLine();
+                if(ImGui::TreeNodeEx("Source", ImGuiTreeNodeFlags_DefaultOpen)) {
                     const float draw_height = (document.num_newlines+2) * ImGui::GetFontSize();
                     
                     ImGui::InputTextMultiline("##SOURCE", 
@@ -208,6 +210,7 @@ void RMSBGui::render(RMSB* rmsb) {
                 ImGui::PopID();
                 ImGui::Separator();
             }
+            
             counter++;
         }
         ImGui::End();

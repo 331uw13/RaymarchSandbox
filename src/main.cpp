@@ -49,7 +49,7 @@ void loop(RMSB* rmsb) {
             editor.update(rmsb);
         }
         editor.render(rmsb);
-
+        rmsb->render_3d();
        
         if(rmsb->show_fps) {
             DrawFPS(10, GetScreenHeight()-20);

@@ -16,9 +16,6 @@
 #define DEFAULT_WIN_WIDTH 1200
 #define DEFAULT_WIN_HEIGHT 800
 
-#define STARTUP_CMD_BEGIN_TAG "@startup_cmd"
-#define STARTUP_CMD_END_TAG   "@end"
-
 #define INFO_ARRAY_MAX_SIZE 32
 
 
@@ -31,9 +28,9 @@ struct infotext_t {
     int   enabled;
 };
 
+// Raymarch camera.
 struct camera_t {
     Vector3 pos;
-    Vector3 dir;
     float yaw;
     float pitch;
     float sensetivity;
@@ -99,7 +96,8 @@ class RMSB {
 
         RMSBGui      gui;
 
-        struct camera_t camera;
+        struct camera_t ray_camera;
+        Camera          raster_camera;
 
         void init();
         void quit();
@@ -108,10 +106,11 @@ class RMSB {
         // TODO: Add support for reading values back.
         // this is here because of it. (Not implemented yet).
         uint32_t         create_ssbo(int binding_point, size_t size);
-        
+     
         struct texture_t create_empty_texture(int width, int height, int format);
         void             delete_texture(struct texture_t* tex);
 
+        void render_3d();
         void render_shader();
         
         void reload_shader();
@@ -125,39 +124,31 @@ class RMSB {
         // Reset camera.
         void reload_state();
 
-
         void loginfo(Color color, const char* text, ...);
         void render_infolog();
-
         enum Mode mode;
-
         int input_key; // See 'src/input.cpp'
 
+        // Call this with NULL, if editing stops.
+        void set_position_uniform_ptr(Uniform* ptr);
 
     private:
+    
+        bool m_user_hold_uniform_pos;
+        int  m_user_hold_axis_i;
+
+        Uniform* m_pos_uniform_ptr;
 
         Vector2 m_mouse_pos;
         struct infotext_t m_infolog[INFO_ARRAY_MAX_SIZE];
         size_t m_infolog_size;
 
-        // When this values is 'true'
-        // and RMSB::reload_shader is called,
-        // the custom uniform settings(aka startup cmd) is parsed
-        // from the shader file.
+        // When this values is 'true' and RMSB::reload_shader is called,
+        // the uniform metadata from the shader file is read.
+        // uniform values are saved there so only single file can be needed.
         bool m_first_shader_load;
 
-        // On first load need to add the uniforms that are in.
-        // @startup_command .... @end  region.
-        // TODO: Move these maybe somewhere else ???
-        void run_shader_startup_cmd(const std::string* shader_code);
-        void get_cmdline_value(const std::string& code_line, float values[4]);
-        void process_shader_startup_cmd_line(const std::string& code_line);
-        
-    
-        // @startup_command  and @end are not valid glsl code.
-        // they must be removed after reading.
-        void remove_startup_cmd_blocks(std::string* shader_code);
-
+        void edit_position_uniform();
         void update_camera();
 };
 

@@ -3,11 +3,11 @@
 
 
 class RMSB;
-struct uniform_t;
+struct Uniform;
 
 namespace UniformsTab
 {
-    void edit_uniform(struct uniform_t* uniform);
+    void edit_uniform(RMSB* rmsb, Uniform* uniform);
     void render(RMSB* rmsb);
 }
 

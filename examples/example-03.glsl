@@ -2,7 +2,9 @@
   Example #3
     
     Translucent materials
-    Note: The camera control also works in this example.
+
+
+Note: Try changing values from the "Uniform Input" tab.
 */
 
 
@@ -85,10 +87,7 @@ void entry() {
 // when the shader is compiled the first time.
 // They can be then modified at run time
 // from "Input" tab. Or add new ones from the gui.
-@startup_cmd
-
-ADD COLOR sphere_color (0.928, 0.583, 0.387, 1.000);
-ADD COLOR box_color (0.137, 0.896, 0.850, 1.000);
-
-@end
-
+@_UNIFORM_METADATA
+    "sphere_color"(RGBA)[0.928, 0.583, 0.387, 1.000]
+    "box_color"(RGBA)[0.137, 0.896, 0.850, 1.000]
+@_UNIFORM_METADATA_END

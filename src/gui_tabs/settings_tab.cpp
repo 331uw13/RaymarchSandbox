@@ -154,27 +154,27 @@ void SettingsTab::render(RMSB* rmsb) {
 
     if(ImGui::CollapsingHeader("Camera Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         
-        ImGui::TextColored(ImVec4(1.0, 0.3, 0.3, 1.0), "X:%0.3f ", rmsb->camera.pos.x);
+        ImGui::TextColored(ImVec4(1.0, 0.3, 0.3, 1.0), "X:%0.3f ", rmsb->ray_camera.pos.x);
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.3, 1.0, 0.3, 1.0), "Y:%0.3f ", rmsb->camera.pos.y);
+        ImGui::TextColored(ImVec4(0.3, 1.0, 0.3, 1.0), "Y:%0.3f ", rmsb->ray_camera.pos.y);
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.4, 0.4, 1.0, 1.0), "Z:%0.3f ", rmsb->camera.pos.z);
+        ImGui::TextColored(ImVec4(0.4, 0.4, 1.0, 1.0), "Z:%0.3f ", rmsb->ray_camera.pos.z);
 
         ImGui::SliderFloat("##CAMERA_SENSETIVITY",
-                &rmsb->camera.sensetivity, 0.001, 1.0,
+                &rmsb->ray_camera.sensetivity, 0.001, 1.0,
                 "Sensetivity: %0.3f");
        
         ImGui::SliderFloat("##CAMERA_MOVEMENT_SPEED",
-                &rmsb->camera.move_speed, 1.0, 60.0,
+                &rmsb->ray_camera.move_speed, 1.0, 60.0,
                 "Movement Speed: %0.01f");
 
         if(ImGui::Button("Reset position")) {
-            rmsb->camera.pos = (Vector3){ 0, 0, 0 };
+            rmsb->ray_camera.pos = (Vector3){ 0, 0, 0 };
         }
         
         if(ImGui::Button("Reset direction")) {
-            rmsb->camera.yaw = 0;
-            rmsb->camera.pitch = 0;
+            rmsb->ray_camera.yaw = 0;
+            rmsb->ray_camera.pitch = 0;
         }
 
         ImGui::Separator();

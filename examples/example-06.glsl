@@ -3,6 +3,8 @@
     
     Soft shadows and Ambient occlusion.
     
+          
+Note: Try changing the colors from the "Uniform Input" tab.
 */
 
 
@@ -120,9 +122,7 @@ void entry() {
 // when the shader is compiled the first time.
 // They can be then modified at run time
 // from "Input" tab. Or add new ones from the gui.
-@startup_cmd
-
-ADD COLOR fog_colors (0.289, 0.289, 0.289, 1.000);
-ADD COLOR box_color (0.275, 0.867, 0.703, 1.000);
-@end
-
+@_UNIFORM_METADATA
+    "fog_colors"(RGBA)[0.289, 0.289, 0.289, 1.000]
+    "box_color"(RGBA)[0.275, 0.867, 0.703, 1.000]
+@_UNIFORM_METADATA_END

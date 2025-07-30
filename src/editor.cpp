@@ -5,6 +5,7 @@
 #include "editor.hpp"
 #include "rmsb.hpp"
 #include "util.hpp"
+#include "uniform_metadata.hpp"
 
 #define FONT_FILEPATH "./Px437_IBM_Model3x_Alt4.ttf"
 #define FONT_SPACING 1.0
@@ -57,7 +58,7 @@ void Editor::init() {
     this->error_row = 0;
     this->error_column = 0;
 
-    m_clipboard.clear();
+    this->clipboard.clear();
     m_fontsize = 16;
     m_size = (Vector2){ 700, (float)(this->page_size * m_fontsize) };
     m_pos = (Vector2){ GUI_WIDTH+20, 300 };
@@ -171,19 +172,18 @@ void Editor::clear_undo_stack() {
 }
 
 void Editor::save(const std::string& filepath) {
-    std::string content = get_content();
+    std::string shader_code = get_content();
 
+    UniformMetadata::write(&shader_code);
+    /*
     InternalLib& ilib = InternalLib::get_instance();
-    for(struct uniform_t u : ilib.uniforms) {
-        set_startupcmd_values(
-                content,
-                u.name.c_str(),
-                u.values
-                );
+    for(Uniform u : ilib.uniforms) {
+        
+        //save_uniform_values(shader_code, &u); // <- Defined in util.cpp
     }
+    */
 
-
-    SaveFileText(filepath.c_str(), (char*)content.c_str());
+    SaveFileText(filepath.c_str(), (char*)shader_code.c_str());
     reset_diff();
 }
 
@@ -549,7 +549,7 @@ void Editor::get_selected(struct selectreg_t* reg) {
 
 
 void Editor::copy_selected() {
-    m_clipboard.clear();
+    this->clipboard.clear();
 
     struct selectreg_t reg;
     get_selected(&reg);
@@ -558,18 +558,18 @@ void Editor::copy_selected() {
     std::string* end_line = get_line(reg.end_y);
 
     if(reg.start_y == reg.end_y) { /* Copy one line selection */
-        m_clipboard = start_line->substr(reg.start_x, reg.end_x - reg.start_x);
+        this->clipboard = start_line->substr(reg.start_x, reg.end_x - reg.start_x);
     }
     else { /* Copy multiline selection */
 
-        m_clipboard = start_line->substr(reg.start_x, start_line->size() - reg.start_x);
+        this->clipboard = start_line->substr(reg.start_x, start_line->size() - reg.start_x);
         
-        m_clipboard.push_back('\n');
+        this->clipboard.push_back('\n');
         for(size_t y = reg.start_y+1; y < reg.end_y; y++) {
-            m_clipboard += *get_line(y) + '\n';
+            this->clipboard += *get_line(y) + '\n';
         }
 
-        m_clipboard += end_line->substr(0, reg.end_x);
+        this->clipboard += end_line->substr(0, reg.end_x);
     }
 
     m_select.active = false;
@@ -593,8 +593,8 @@ void Editor::paste_clipboard() {
     int iy = 0;
     int ix = cursor.x;
 
-    for(size_t i = 0; i < m_clipboard.size(); i++) {
-        char c = m_clipboard[i];
+    for(size_t i = 0; i < this->clipboard.size(); i++) {
+        char c = this->clipboard[i];
 
         int64_t y = cursor.y + iy;
 
@@ -611,7 +611,7 @@ void Editor::paste_clipboard() {
         if(read_first_ln_size) {
             first_ln_size++;
         }
-        add_char(m_clipboard[i], ix, y);
+        add_char(this->clipboard[i], ix, y);
         ix++;
     }
 

@@ -10,33 +10,36 @@
 #define CUSTOM_UNIFORMS_TAG_END   "//__tag__UNIFORMS_END\n"
 
 
+enum UniformDataType : int {
+    RGBA = 0,
+    XYZ,
+    SINGLE,
 
-#define UNIFORM_TYPE_COLOR 0
-#define UNIFORM_TYPE_VALUE 1
-#define UNIFORM_TYPE_POSITION 2
-#define NUM_UNIFORM_TYPES 3
-
-static const int UNIFORM_TYPES[] = {
-    UNIFORM_TYPE_COLOR,
-    UNIFORM_TYPE_VALUE,
-    UNIFORM_TYPE_POSITION
+    NUM_TYPES,
+    INVALID
 };
 
-static const char* const UNIFORM_TYPES_STR[] = {
-    "Color",
-    "Value",
-    "Position"
+static const UniformDataType UNIFORM_DATA_TYPES[] = {
+    UniformDataType::RGBA,
+    UniformDataType::XYZ,
+    UniformDataType::SINGLE
 };
 
 static const char* const UNIFORM_DATA_TYPES_STR[] = {
-    /* Color */    "vec4",
-    /* Value */    "float",
-    /* Position */ "vec3"
+    "RGBA",
+    "XYZ",
+    "SINGLE"
+};
+
+static const char* const UNIFORM_GLSL_TYPES_STR[] = {
+    "vec4",
+    "vec3",
+    "float"
 };
 
 
-struct uniform_t {
-    int  type;
+struct Uniform {
+    UniformDataType type;
     int  location;
     // 0:       Used for floating point value,
     // 0,1,3:   Used for position.
@@ -52,7 +55,7 @@ struct u8col_t {
 };
 
 // NOTE: Documents are rendered at 'src/rmsb_gui.cpp' render().
-struct document_t {
+struct Document {
     std::string code;
     std::string desc;
     std::string name;
@@ -72,13 +75,13 @@ class InternalLib {
         void create_source();
         void add_document     (const char* code, const char* description, struct u8col_t color, const char* link = NULL);
         void add_info         (const char* title, const char* description, struct u8col_t color, const char* link = NULL);
-        void add_uniform      (struct uniform_t* u);
-        void remove_uniform   (struct uniform_t* u);
+        void add_uniform      (Uniform* u);
+        void remove_uniform   (Uniform* u);
         
         const std::string get_source();
 
-        std::list<struct document_t> documents;
-        std::list<struct uniform_t> uniforms;
+        std::list<Document> documents;
+        std::list<Uniform> uniforms;
 
         void clear();
 
@@ -90,7 +93,7 @@ class InternalLib {
 
     private:
 
-        std::string get_uniform_code_line(struct uniform_t* u);
+        std::string get_uniform_code_line(Uniform* u);
 
         std::string source;
         InternalLib() {}
