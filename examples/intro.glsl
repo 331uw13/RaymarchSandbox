@@ -159,11 +159,9 @@ void entry() {
 // They can be then modified at run time
 // from "Input" tab. Or add new ones from the gui.
 @_UNIFORM_METADATA
-
-//ADD COLOR test_color (0.948, 0.004, 0.277, 1.000);
-//ADD COLOR light_color (0.560, 1.000, 0.108, 0.882);
-//ADD COLOR fog_color (0.944, 0.320, 0.254, 0.000);
-//ADD COLOR transparent_color (0.145, 0.723, 0.660, 1.000);
-
+    "test_color"(RGBA)[0.948, 0.004, 0.277, 1.000]
+    "light_color"(RGBA)[0.560, 1.000, 0.108, 0.882]
+    "fog_color"(RGBA)[0.944, 0.320, 0.254, 0.000]
+    "transparent_color"(RGBA)[0.145, 0.723, 0.660, 1.000]
 @_UNIFORM_METADATA_END
 
