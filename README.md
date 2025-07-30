@@ -80,6 +80,17 @@ custom_render_resolution_Y = 0
 
 ## Recent Updates
 
+* Wed Jul 30 2025
+```
+- Changes to uniform saving:
+   - New format is "uniform_name"(RGBA/XYZ/SINGLE)[valueX, valueY, valueZ, valueW]
+   - RGBA: Color.
+   - XYZ: Position.
+   - SINGLE: One floating point value
+   - Before there was issues with saving new added uniforms from gui, that should also be fixed now.
+- Added position input for shaders
+```
+
 * Tue Jul 29 2025
 ```
 - Added file browser.
