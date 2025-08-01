@@ -10,6 +10,7 @@
 
 void ErrorLog::add(const char* text) {
     m_log.push_back(text);
+
 }
 
 void ErrorLog::clear() {

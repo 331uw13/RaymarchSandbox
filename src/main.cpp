@@ -2,6 +2,8 @@
 #include <cmath>
 #include "rmsb.hpp"
 #include "input.hpp"
+#include "logfile.hpp"
+
 #include "libs/INIReader.h"
 #include "libs/glad.h"
 
@@ -97,6 +99,10 @@ void read_config(RMSB* rmsb) {
         return;
     }
 
+    // Note:
+    // The errors happening with config file reading
+    // should be displayed to the user with rmsb->loginfo 
+    // and written to logfile.
 
     rmsb->fps_limit = reader.GetInteger(
             "render_settings",
@@ -136,6 +142,7 @@ void read_config(RMSB* rmsb) {
             "render_resolution", "");
     if(res_str.empty()) {
         rmsb->loginfo(RED, "Could not find render resolution setting! Set to 'HALF'");
+        append_logfile(ERROR, "Could not find render resolution setting.");
         res_str = "HALF";
     }
 
@@ -162,10 +169,12 @@ void read_config(RMSB* rmsb) {
 
         if(res_x <= 0) {
             rmsb->loginfo(RED, "Custom resolution X is invalid, set to half.");
+            append_logfile(ERROR, "Custom resolution X is invalid. Too small.");
             res_x = rmsb->monitor_width/2;
         }
         if(res_y <= 0) {
             rmsb->loginfo(RED, "Custom resolution Y is invalid, set to half.");
+            append_logfile(ERROR, "Custom resolution Y is invalid. Too small.");
             res_y = rmsb->monitor_height/2;
         }
 
@@ -186,23 +195,29 @@ void read_config(RMSB* rmsb) {
 int main(int argc, char** argv) {
 
     if(argc != 2) {
-        fprintf(stderr, "Usage: %s example.glsl\n", argv[0]);
+        fprintf(stderr, 
+                "\033[36m[RaymarchSandbox]\033[0m\n"
+                "Usage: %s <shader.glsl>\n"
+                "\033[90m> Already existing file is read, otherwise empty template is created\n"
+                "\033[90m> To get started, reading examples/intro.glsl and other examples is recommended.\033[0m\n"
+                , argv[0]);
         return 1;
     }
 
+    assign_logfile("rmsb.log");
     const char* shader_filepath = argv[1];
     
 
     if(!FileExists(shader_filepath)) {
         create_template_shader(shader_filepath);
-        printf("Shader \"%s\" did not exist. Created new template\n",
+        append_logfile(INFO, "Shader \"%s\" did not exist. Created new template.",
                 shader_filepath);
     }
     
     int file_size = GetFileLength(shader_filepath);
     if(file_size <= 0) {
-        // TODO: Get rid of this.
-        fprintf(stderr, "ERROR: Shader \"%s\" is empty.\n", shader_filepath);
+        // This should not happen but just in case inform the user.
+        append_logfile(ERROR, "Shader \"%s\" is empty.. Failed to create template?");
         return 1;
     }
 
@@ -222,6 +237,7 @@ int main(int argc, char** argv) {
     loop(&rmsb);
     rmsb.quit();
     editor.quit();
+    close_logfile();
 
     return 0;
 }

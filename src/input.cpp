@@ -83,6 +83,10 @@ void InputHandler::handle_view_mode(RMSB* rmsb) {
             EnableCursor();
         }
     }
+    else
+    if(IsKeyPressed(KEY_S)) {
+        rmsb->loginfo(PURPLE, "View_Mode doesnt have \"save\", switch to Edit_Mode.");
+    }
     
 }
 
@@ -113,6 +117,8 @@ void InputHandler::handle_edit_mode(RMSB* rmsb) {
         case KEY_Z:
             editor.undo();
             break;
+
+        // ... More stuff can be added later.
     }
 }
 

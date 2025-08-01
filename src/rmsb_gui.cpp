@@ -196,7 +196,6 @@ void RMSBGui::render(RMSB* rmsb) {
                     ImGui::TextLink(document.link.c_str());
                 }
 
-                ImGui::SameLine();
                 if(ImGui::TreeNodeEx("Source", ImGuiTreeNodeFlags_DefaultOpen)) {
                     const float draw_height = (document.num_newlines+2) * ImGui::GetFontSize();
                     

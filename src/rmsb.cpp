@@ -13,6 +13,7 @@
 #include "shader_util.hpp"
 #include "preproc.hpp"
 #include "uniform_metadata.hpp"
+#include "logfile.hpp"
 
 #include <rlgl.h>
 
@@ -47,29 +48,51 @@ GLSL_VERSION
 "}\n"
 ;
 
-/*
-static void tracelog_callback(int log_level, const char* text, va_list args) {
-#define BUF_SIZE 4096
+static void raylib_message(int log_level, const char* text, va_list args) {
+
+    #define BUF_SIZE 4096
     char buf[BUF_SIZE] = { 0 };
     vsnprintf(buf, BUF_SIZE, text, args);
-    puts(buf);
+    append_logfile(INFO, buf);
 }
-*/
+
+void GLAPIENTRY opengl_message(
+        GLenum source,
+        GLenum type,
+        GLuint id,
+        GLenum severity, 
+        GLsizei length,
+        const GLchar* message,
+        const void* user_ptr
+){
+    if(type != GL_DEBUG_TYPE_ERROR) {
+        return;
+    }
+
+    append_logfile(ERROR, "(OpenGL) ID=0%X, Severity=0x%X | %s", 
+            id, severity, message);
+}
+
 
 void RMSB::init() {
     this->running = true;
 
-    SetTraceLogLevel(LOG_NONE);
+    SetTraceLogLevel(LOG_ALL);
+    SetTraceLogCallback(raylib_message);
     
     InitWindow(
         DEFAULT_WIN_WIDTH,
         DEFAULT_WIN_HEIGHT,
         "Raymarch Sandbox"
     );
+
     SetWindowMinSize(GUI_WIDTH+FUNCTIONS_VIEW_WIDTH, 600);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
     SetExitKey(0);
-   
+
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(opengl_message, 0);
+
     Editor& editor = Editor::get_instance();
     editor.init();
     editor.load_file(this->shader_filepath);
@@ -117,7 +140,6 @@ void RMSB::init() {
 
 
     SetTargetFPS(this->fps_limit);
-    //SetTraceLogCallback(tracelog_callback);
     
     ToggleBorderlessWindowed();
 

@@ -14,12 +14,8 @@
 // Very basic text editor for editting GLSL code.
 
 /*
-    TODO LIST.
-
-    * Callbacks for rendering so all kind of graphics libraries can use this.
-    * Cross platform file IO (without raylib).
+    TODO LIST:
     * Make this class Not a signleton and create EditorManager to allow multiple editors.
-
 */
 
 class RMSB;

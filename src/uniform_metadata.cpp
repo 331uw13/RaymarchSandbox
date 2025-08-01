@@ -3,6 +3,7 @@
 
 #include "uniform_metadata.hpp"
 #include "internal_lib.hpp"
+#include "logfile.hpp"
 
 
 template<typename F, typename Arguments>
@@ -15,8 +16,7 @@ static void UniformMetadata_foreach(F fn, Arguments args) {
     std::string::size_type   end_idx = shader_code.find(UniformMetadata::TAG_END);
 
     if((begin_idx == std::string::npos) || (end_idx == std::string::npos)) {
-        fprintf(stderr, "%s @ %s: No valid uniform metadata.\n",
-                __FILE__, __func__);
+        append_logfile(WARNING, "No valid uniform metadata tags was found.");
         return;
     }
 
@@ -41,8 +41,7 @@ static void UniformMetadata_foreach(F fn, Arguments args) {
         buffer[bufidx] = c;
         bufidx++;
         if(bufidx >= buffer_size) {
-            fprintf(stderr, "%s @ %s: Warning! line is very long, ignored.\n", 
-                    __FILE__, __func__);
+            append_logfile(WARNING, "Uniform metadata line is very long it is ignored.");
             memset(buffer, 0, bufidx);
             bufidx = 0;
         }
@@ -56,8 +55,7 @@ void UniformMetadata::remove(std::string* shader_code) {
     std::string::size_type   end_idx = shader_code->find(UniformMetadata::TAG_END);
 
     if((begin_idx == std::string::npos) || (end_idx == std::string::npos)) {
-        fprintf(stderr, "%s @ %s: No valid uniform metadata.\n",
-                __FILE__, __func__);
+        append_logfile(WARNING, "No valid uniform metadata tags was found.");
         return;
     }
 
@@ -109,15 +107,13 @@ void UniformMetadata::read(const std::string& shader_code) {
 
         std::string::size_type name_begin_idx = line.find("\"", 0);
         if(name_begin_idx == std::string::npos) {
-            fprintf(stderr, "%s | syntax error: first '\"' expected for finding 'name'.\n",
-                    __FILE__);
+            append_logfile(ERROR, "Syntax error: first '\"' expected for finding 'name'.");
             return;
         }
 
         std::string::size_type name_end_idx = line.find("\"", name_begin_idx+1);
         if(name_begin_idx == std::string::npos) {
-            fprintf(stderr, "%s | syntax error: second '\"' expected for finding 'name'.\n",
-                    __FILE__);
+            append_logfile(ERROR, "Syntax error: second '\"' expected for finding 'name'.");
             return;
         }
 
@@ -130,15 +126,13 @@ void UniformMetadata::read(const std::string& shader_code) {
 
         std::string::size_type type_begin_idx = line.find("(", name_end_idx);
         if(type_begin_idx == std::string::npos) {
-            fprintf(stderr, "%s | syntax error: '(' expected for finding 'type'.\n",
-                    __FILE__);
+            append_logfile(ERROR, "Syntax error: '(' expected for finding 'type'.");
             return; 
         }
         
         std::string::size_type type_end_idx = line.find(")", type_begin_idx+1);
         if(type_begin_idx == std::string::npos) {
-            fprintf(stderr, "%s | syntax error: ')' expected for finding 'type'.\n",
-                    __FILE__);
+            append_logfile(ERROR, "Syntax error: ')' expected for finding 'type'");
             return; 
         }
 
@@ -156,8 +150,7 @@ void UniformMetadata::read(const std::string& shader_code) {
         }
 
         if(datatype == UniformDataType::INVALID) {
-            fprintf(stderr, "%s | error: uniform data type \"%s\" is invalid.\n",
-                    __FILE__, type_str.c_str());
+            append_logfile(ERROR, "Uniform data type '%s' is invalid.", type_str.c_str());
             return;
         }
 
@@ -167,15 +160,13 @@ void UniformMetadata::read(const std::string& shader_code) {
         
         std::string::size_type values_begin_idx = line.find("[", type_end_idx);
         if(values_begin_idx == std::string::npos) {
-            fprintf(stderr, "%s | syntax error: '[' expected for finding 'values'.\n",
-                    __FILE__);
+            append_logfile(ERROR, "Syntax error: '[' expected for finding 'values'");
             return; 
         }
         
         std::string::size_type values_end_idx = line.find("]", values_begin_idx+1);
         if(values_begin_idx == std::string::npos) {
-            fprintf(stderr, "%s | syntax error: ']' expected for finding 'values'.\n",
-                    __FILE__);
+            append_logfile(ERROR, "Syntax error: ']' expected for finding 'values'");
             return; 
         }
 
@@ -206,8 +197,7 @@ void UniformMetadata::read(const std::string& shader_code) {
             buffer[bufidx] = c;
             bufidx++;
             if(bufidx >= buffer_size) {
-                fprintf(stderr, "%s | error: uniform metadata value is too large.\n",
-                        __FILE__);
+                append_logfile(ERROR, "Uniform metadata value is too large.");
                 return;
             }
         }

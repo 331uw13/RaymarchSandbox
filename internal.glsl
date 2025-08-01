@@ -2,6 +2,10 @@
 
 // https://github.com/331uw13/RaymarchSandbox
 
+// ----
+// TODO: Remove unused stuff from earlier testing.
+// ----  
+
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout (rgba16f, binding = 8) uniform image2D output_img;
@@ -271,7 +275,7 @@ FUNC void Raymarch(vec3 ro, vec3 rd)
     _FLAG_reflect = 0;
     Ray.closest_mat = EmptyMaterial();
     
-    Ray.volume_color = vec3(0);
+   // Ray.volume_color = vec3(0);
     Ray.solid_color = vec3(0);
 
     Raymarch_I(ro, rd);
@@ -373,19 +377,22 @@ FUNC_END
 
 float MapValue(float t, float src_min, float src_max, float dst_min, float dst_max);
 
+
 /* -INFO
-Return a shadow value for point 'p'
-to light point.
+This function will be used to calculate shadows.
+You should use GetShadow_LightPoint / Directional
+This exists here only for documentation.
+
 https://iquilezles.org/articles/rmshadows/
 */
-FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value)
+FUNC float GetShadowExt(vec3 p, vec3 light_dir, float w, float max_value)
 {
     w = MapValue(w, 0.0, 1.0, 0.001, 0.1);
     float shadow = 1.0;
     RAY_T old_ray = Ray;
 
-    vec3 dir = normalize(light_pos - p);
-    p += (dir * 0.01);
+    //vec3 dir = normalize(light_pos - p);
+    p += (light_dir * 0.01);
  
     Ray.hit = 0;
     Ray.len = 0.0;
@@ -396,7 +403,7 @@ FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value
     float ph = 1e20;
 
     while(Ray.len < MAX_RAY_LENGTH) {
-        Ray.pos = p + dir * Ray.len;
+        Ray.pos = p + light_dir * Ray.len;
         Material c = map(Ray.pos);
 
         if(Mdistance(c) <= 0.0001) {
@@ -417,6 +424,32 @@ FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value
     return clamp(shadow, max_value, 1.0);
 }
 FUNC_END
+
+
+/* -INFO
+Return a shadow value for point 'p'
+For Light Point.
+Note: Using directional light position as 'light_pos'
+      will create unwanted results.
+*/
+FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value)
+{
+    return GetShadowExt(p, normalize(light_pos - p), w, max_value);
+}
+FUNC_END
+
+/* -INFO
+Return a shadow value for point 'p'
+For Directional Light.
+Note: Using light point position as 'light_pos'
+      will create unwanted results.
+*/
+FUNC float GetShadow_LightDirectional(vec3 p, vec3 light_direction, float w, float max_value)
+{
+    return GetShadowExt(p, normalize(light_direction), w, max_value);
+}
+FUNC_END
+
 
 
 vec3 Hash3(vec3 x);

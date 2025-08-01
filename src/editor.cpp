@@ -175,13 +175,6 @@ void Editor::save(const std::string& filepath) {
     std::string shader_code = get_content();
 
     UniformMetadata::write(&shader_code);
-    /*
-    InternalLib& ilib = InternalLib::get_instance();
-    for(Uniform u : ilib.uniforms) {
-        
-        //save_uniform_values(shader_code, &u); // <- Defined in util.cpp
-    }
-    */
 
     SaveFileText(filepath.c_str(), (char*)shader_code.c_str());
     reset_diff();
