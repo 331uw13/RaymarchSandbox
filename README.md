@@ -80,6 +80,13 @@ custom_render_resolution_Y = 0
 
 ## Recent Updates
 
+* Fri Aug  1 2025
+```
+- Raylib tracelog, OpenGL errors and other reasonable info are now written into "rmsb.log"
+- Added Soft shadows for directional light.
+- Small improvements.
+```
+
 * Wed Jul 30 2025
 ```
 - Changes to uniform saving:
