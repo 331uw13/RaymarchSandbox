@@ -1,13 +1,13 @@
 # RaymarchSandbox
 
-#### Made with raylib (https://github.com/raysan5/raylib)  and imgui (https://github.com/ocornut/imgui)
+Made with Raylib (https://github.com/raysan5/raylib) and ImGui (https://github.com/ocornut/imgui)
 
- References for raymarching from iq: https://iquilezles.org/articles/
+Also check out Inigo Quilez's articles about raymarching: https://iquilezles.org/articles/
  
 -----------------------------------
 
 ## Features
-* Built-in functions for raymarching.
+* "Built-in" functions for raymarching.
 * Text editor with GLSL syntax highlight.
 * Custom uniform inputs.  (texture input not implemented yet.)
 * First person camera support.
@@ -67,6 +67,14 @@ custom_render_resolution_Y = 0
 
 -----------------------------------
 
+## Want to contribute?
+
+If you have a new feature or even small improvement in mind feel free to open an "issue" or submit a pull request.
+
+There are not strict rules about code style, but try to keep the code readable and use descriptive names for functions and variables.
+
+-----------------------------------
+
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarchsandbox_0.png?raw=true)
 
 ![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/soft_shadows_and_ao.png?raw=true)
@@ -77,6 +85,7 @@ custom_render_resolution_Y = 0
 
 
 -----------------------------------
+
 
 ## Recent Updates
 
