@@ -75,19 +75,27 @@ There are not strict rules about code style, but try to keep the code readable a
 
 -----------------------------------
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarchsandbox_0.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox_2.png?raw=true)
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/soft_shadows_and_ao.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox_1.png?raw=true)
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/experiment_3.png?raw=true)
+![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/raymarch-sandbox_0.png?raw=true)
 
-![image](https://github.com/331uw13/RaymarchSandbox/blob/main/screenshots/rmsb-intro.png?raw=true)
 
 
 -----------------------------------
 
 
 ## Recent Updates
+
+* Sat Aug  2 2025
+```
+- Updated ImGui style.
+- Font filepaths are now read from config file.
+- Added texture mapping.
+- Editor can be resized now.
+- Small improvements.
+```
 
 * Fri Aug  1 2025
 ```
