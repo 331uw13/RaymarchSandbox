@@ -114,11 +114,26 @@ void InputHandler::handle_edit_mode(RMSB* rmsb) {
             rmsb->loginfo(GREEN, TextFormat("Shader Saved (%s)", rmsb->shader_filepath.c_str()));
             break;
 
+        case KEY_LEFT:
+            editor.move_cursor_word_left();
+            break;
+
+        case KEY_RIGHT:
+            editor.move_cursor_word_right();
+            break;
+
+        case KEY_UP:
+            editor.move_cursor_up_until_emptyrow();
+            break;
+
+        case KEY_DOWN:
+            editor.move_cursor_down_until_emptyrow();
+            break;
+
         case KEY_Z:
             editor.undo();
             break;
 
-        // ... More stuff can be added later.
     }
 }
 

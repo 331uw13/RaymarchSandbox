@@ -43,9 +43,9 @@ void SettingsTab::render(RMSB* rmsb) {
     ImGui::SameLine();
     if(ImGui::Button("Open Shader")) {
         FileBrowser& filebrowser = FileBrowser::Instance();
-        filebrowser.open(".", "Open New Shader", ".glsl");
+        filebrowser.open(".", "Open new shader", ".glsl");
         filebrowser.register_task_callback(
-                FileBrowserCallbacks::shader_selected
+                FileBrowserCallbacks::shader_selected, NULL
                 );
     }
 

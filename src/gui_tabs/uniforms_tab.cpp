@@ -42,6 +42,30 @@ void UniformsTab::edit_uniform(RMSB* rmsb, Uniform* uniform) {
             break;
 
 
+        case UniformDataType::TEXTURE:
+            {
+                ImGui::TextColored(ImVec4(0.3, 1.0, 0.3, 1.0), 
+                        "ID = %i", uniform->texid_for_user);
+                constexpr ImVec2 img_size = ImVec2(255, 255);
+                if(uniform->has_texture) {
+                    ImGui::Image(uniform->texture.id, img_size);
+                }
+                else {
+                    ImGui::Image(rmsb->res.images[ImageIdx::EMPTY].id, img_size);
+                }
+
+                ImGui::SameLine();
+                if(ImGui::Button("Load")) {
+                    FileBrowser& filebrowser = FileBrowser::Instance();
+                    filebrowser.open(".", "Load new texture");
+                    filebrowser.register_task_callback(
+                            FileBrowserCallbacks::texture_selected, uniform
+                            );
+                }
+
+            }
+            break;
+
         case UniformDataType::INVALID:break;
         case UniformDataType::NUM_TYPES:break;
         default:break;
@@ -56,7 +80,7 @@ void UniformsTab::render(RMSB* rmsb) {
 
     InternalLib& ilib = InternalLib::get_instance();
     
-    static char name_buf[32] = { 0 };
+    static char name_buf[32+1] = { 0 };
     
     ImGui::Separator();
 
@@ -79,15 +103,7 @@ void UniformsTab::render(RMSB* rmsb) {
         // Pre-check for invalid naming, this will avoid
         // removing the uniform and fixing the name if its bad for glsl.
         if(is_uniform_name_valid(name_buf, name_size)) {
-           
-            Uniform uniform = (Uniform) {
-                .type = UNIFORM_DATA_TYPES[selected_index],
-                .location = 0,
-                .values = { 0, 0, 0, 1.0 },
-                .name = name_buf,
-            };
-
-            uniform.name.push_back('\0');
+            Uniform uniform = Uniform(name_buf, UNIFORM_DATA_TYPES[selected_index]);
             ilib.add_uniform(&uniform);
 
             // Clear text input.
@@ -109,6 +125,9 @@ void UniformsTab::render(RMSB* rmsb) {
         // Button for removing elements.
         if(ImGui::SmallButton("X")) {
             ilib.remove_uniform(&(*uniform));
+            if(uniform->has_texture) {
+                UnloadTexture(uniform->texture);
+            }
             uniform = ilib.uniforms.erase(uniform);
             ImGui::PopID();
             continue;

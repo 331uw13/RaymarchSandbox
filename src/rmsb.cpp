@@ -74,7 +74,34 @@ void GLAPIENTRY opengl_message(
 }
 
 
-void RMSB::init() {
+void RMSB::load_resource_img(ImageIdx index, const char* path) {
+    if(this->res.num_images >= RMSB_MAX_RESOURCE_IMAGES) {
+        fprintf(stderr, "Cant fit more images to 'RMSB::res.images'... Resize the array!\n");
+        return;
+    }
+
+    if(!FileExists(path)) {
+        append_logfile(ERROR, "\"%s\": Does not exists.", path);
+        return;
+    }
+
+    this->res.images[index].id = 0;
+    this->res.images[index] = LoadTexture(path);
+    if(this->res.images[index].id == 0) {
+        append_logfile(ERROR, "\"%s\" Failed to load.", path);
+    }
+    this->res.num_images++;
+}
+
+
+void RMSB::load_resources() {
+    
+    load_resource_img(ImageIdx::EMPTY, "textures/empty.png");
+
+
+}
+
+void RMSB::init(const char* imgui_font_ttf, const char* editor_font_ttf) {
     this->running = true;
 
     SetTraceLogLevel(LOG_ALL);
@@ -93,11 +120,13 @@ void RMSB::init() {
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(opengl_message, 0);
 
+    this->load_resources();
+
     Editor& editor = Editor::get_instance();
-    editor.init();
+    editor.init(editor_font_ttf);
     editor.load_file(this->shader_filepath);
 
-    this->gui.init();
+    this->gui.init(imgui_font_ttf);
 
     m_infolog_size = 0;
     m_first_shader_load = true;
@@ -159,8 +188,8 @@ void RMSB::init() {
     */
 }
 
-struct texture_t RMSB::create_empty_texture(int width, int height, int format) {
-    struct texture_t tex;
+Texture RMSB::create_empty_texture(int width, int height, int format) {
+    Texture tex;
     tex.width = width;
     tex.height = height;
     tex.format = format;
@@ -180,8 +209,9 @@ struct texture_t RMSB::create_empty_texture(int width, int height, int format) {
 
     return tex;
 }
+
         
-void RMSB::delete_texture(struct texture_t* tex) {
+void RMSB::delete_texture(Texture* tex) {
     if(tex->id > 0) {
         glDeleteTextures(1, &tex->id);
         tex->id = 0;
@@ -213,6 +243,10 @@ void RMSB::quit() {
     }
 
     this->delete_texture(&this->render_texture);
+
+    for(uint16_t i = 0; i < this->res.num_images; i++) {
+        this->delete_texture(&this->res.images[i]);
+    }
 
     this->gui.quit();
     CloseWindow();
@@ -284,9 +318,15 @@ void RMSB::render_shader() {
         (float)this->monitor_width, (float)this->monitor_height
     };
 
+
+    int num_tex = 0;
     
     InternalLib& ilib = InternalLib::get_instance();
-    for(Uniform u : ilib.uniforms) {
+    glUseProgram(this->compute_shader);
+
+    int texN[16] = { 0 };
+
+    for(Uniform& u : ilib.uniforms) {
 
         switch(u.type) {
             case UniformDataType::RGBA:
@@ -303,10 +343,29 @@ void RMSB::render_shader() {
                 shader_uniform_float(compute_shader, u.name.c_str(), u.values[0]);
                 break;
 
+            case UniformDataType::TEXTURE:
+                if(u.has_texture) {
+                    glActiveTexture(GL_TEXTURE0+num_tex);
+                    glBindTexture(GL_TEXTURE_2D, u.texture.id);
+                    texN[num_tex] = num_tex;
+                    num_tex++;
+                    
+                    u.texid_for_user = num_tex;
+                }
+                break;
+
             case UniformDataType::INVALID:break;
             case UniformDataType::NUM_TYPES:break;
             default:break;
         }
+    }
+
+    if(num_tex > 0) {
+        glUniform1iv(
+                glGetUniformLocation(compute_shader, "TEXTURES"),
+                num_tex,
+                texN
+                );
     }
 
     shader_uniform_float(compute_shader, "time", ftime);
@@ -322,7 +381,7 @@ void RMSB::render_shader() {
     shader_uniform_int(compute_shader, "AO_NUM_SAMPLES", this->ao_num_samples);
     shader_uniform_float(compute_shader, "AO_FALLOFF", this->ao_falloff);
 
-    glUseProgram(this->compute_shader);
+
 	glBindImageTexture(
             8, // Binding point.
             this->render_texture.id,
@@ -364,7 +423,9 @@ void RMSB::reload_shader() {
     if(m_first_shader_load) {
         UniformMetadata::read(shader_code);
     }
-    
+   
+    // TODO: Maybe should be removed once at startup so this dont need
+    // to be called everytime the shader gets reloaded
     UniformMetadata::remove(&shader_code);
 
 

@@ -8,7 +8,7 @@
 
 template<typename F, typename Arguments>
 static void UniformMetadata_foreach(F fn, Arguments args) {
-    printf("%s\n", __func__);
+    //printf("%s\n", __func__);
 
     const std::string shader_code = std::get<0>(std::make_tuple(args));
 
@@ -202,12 +202,8 @@ void UniformMetadata::read(const std::string& shader_code) {
             }
         }
 
-        Uniform uniform = (Uniform) {
-            .type = datatype,
-            .location = -1,
-            .values = { values[0], values[1], values[2], values[3] },
-            .name = name_str
-        };
+        Uniform uniform = Uniform(name_str, datatype);
+        memmove(&uniform.values, values, sizeof(float)*4);
 
         InternalLib::get_instance().add_uniform(&uniform);
         

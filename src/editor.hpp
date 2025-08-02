@@ -40,7 +40,7 @@ class Editor {
         
         std::string title;
 
-        void init();
+        void init(const char* font_filepath);
         void quit();
 
         void render(RMSB* rmsb);
@@ -57,13 +57,16 @@ class Editor {
         void undo();
         void unselect();
 
+        void move_cursor_word_left();
+        void move_cursor_word_right();
+        void move_cursor_up_until_emptyrow();
+        void move_cursor_down_until_emptyrow();
+
         std::string get_content();
         bool        content_changed; // TODO: Rename to "unsaved_changes"
 
         bool has_focus;
         bool mouse_hovered;
-
-
 
         int64_t error_row;
         int64_t error_column;
@@ -88,11 +91,13 @@ class Editor {
         
         std::string clipboard;
 
-    private:
-        
+    private:  
+        enum ResizeEdge { NONE, RIGHT, BOTTOM, RIGHT_CORNER };
+        ResizeEdge  m_resize_edge_active;
         UndoStack   m_undo_stack;
         float       m_undo_timer;
         void        update_undo_stack();
+        float       m_resize_area_size;
 
         double m_diff_check_timer;
         double m_idle_timer;
@@ -107,7 +112,7 @@ class Editor {
         } m_select;
 
         
-        std::map<std::string_view, int> m_color_map;
+        std::map<std::string_view, int> m_color_map; // Colors for keywords.
         Color get_keyword_color(char* buffer);
         Color get_selectbg_color(int y);
 
@@ -119,8 +124,10 @@ class Editor {
         void rem_data(int64_t x, int64_t y, size_t size);
 
         int  count_begin_tabs(std::string* str); // Counts number of tabs until non-whitespace char is found.
-        bool is_string_whitespace(std::string* str);
+        bool is_string_whitespace(const std::string* str);
         bool is_tab_being_removed(const Cursor& cur);
+        void update_resize_edge_possibility();
+        void resize_editor_with_mouse();
 
         void move_cursor_to(int64_t x, int64_t y);
         void move_cursor(int xoff, int yoff);
@@ -158,15 +165,18 @@ class Editor {
 
         Editor() {}
 
-        int m_scroll;
+        int m_scroll; // Vertical scroll.
         int m_fontsize;
         Vector2 m_charsize;
         Vector2 m_pos;
         Vector2 m_size;
-        Vector2 m_grab_offset;
-        int     m_margin;
+        Vector2 m_grab_offset; // Used to offset editor correctly
+                               // to mouse position when moved.
+
+        int  m_margin; // Left side margin.
         bool m_cursor_moved;
         bool m_grab_offset_set;
+        bool m_grab_resizing_editor; // Resize editor instead of moving it.
 
         // Colors.
         Color m_cursor_color;
@@ -175,7 +185,9 @@ class Editor {
         Color m_comment_color;
         Color m_selected_color;
         Color m_margin_color;
-        
+        Color m_resize_area_idle_color;
+        Color m_resize_area_active_color;
+
         char m_tab_width_str[MAX_TAB_WIDTH+1];
 
         void update_charsize();
@@ -186,8 +198,12 @@ class Editor {
         void draw_text_glsl_syntax(const char* text, size_t text_size, float x, float y);
         void draw_selected_reg();
 
+        void draw_resize_edge_RIGHT(Color color);
+        void draw_resize_edge_BOTTOM(Color color);
+
         Color dim_color(Color color, float t);
 
+        // "Draw and clear keyword buffer". see 'Editor::draw_text_glsl_syntax' for more detail.
         void drawnclear_kwbuf(char* kwbuf, size_t* kwbuf_i, int* text_x, int text_y, Color color);
 
         void init_syntax_colors();

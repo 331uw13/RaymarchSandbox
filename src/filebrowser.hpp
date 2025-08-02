@@ -25,8 +25,8 @@ struct File {
 
 namespace FileBrowserCallbacks {
 
-    void shader_selected(RMSB* rmsb, const File& file);
-
+    void shader_selected(RMSB* rmsb, const File& file, void* extptr);
+    void texture_selected(RMSB* rmsb, const File& file, void* extptr);
 };
 
 // File browser should be first opened,
@@ -48,7 +48,7 @@ class FileBrowser {
 
         void close() { m_open = false; };
         bool is_open() { return m_open; };
-        void register_task_callback(void(*callback)(RMSB*, const File&));
+        void register_task_callback(void(*callback)(RMSB*, const File&, void*), void* extptr);
 
         void render(RMSB* rmsb);
 
@@ -67,9 +67,10 @@ class FileBrowser {
         std::string m_task_name;
         std::string m_favor_ext;
 
-        void(*m_task_callback)(RMSB*, const File&);
+        void(*m_task_callback)(RMSB*, const File&, void*);
         bool m_open;
 
+        void* m_task_callback_extptr;
 
 
 };

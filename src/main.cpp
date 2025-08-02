@@ -4,7 +4,7 @@
 #include "input.hpp"
 #include "logfile.hpp"
 
-#include "libs/INIReader.h"
+#include "config.hpp"
 #include "libs/glad.h"
 
 
@@ -89,107 +89,34 @@ void create_template_shader(const char* shader_filepath) {
 }
 
 
-void read_config(RMSB* rmsb) {
+void init_all(RMSB* rmsb) {
 
-    INIReader reader(CONFIG_FILE);
-
-    if(reader.ParseError() < 0) {
+    INIReader ini_reader(CONFIG_FILE);
+    if(ini_reader.ParseError() < 0) {
         fprintf(stderr, "%s: Failed to load '%s'\n",
                 __func__, CONFIG_FILE);
-        return;
+        exit(EXIT_FAILURE);
     }
 
-    // Note:
-    // The errors happening with config file reading
-    // should be displayed to the user with rmsb->loginfo 
-    // and written to logfile.
 
-    rmsb->fps_limit = reader.GetInteger(
-            "render_settings",
-            "fps_limit", 125);
-
-    rmsb->fov = reader.GetReal(
-            "render_settings",
-            "fov", 60.0);  
-
-    rmsb->hit_distance = reader.GetReal(
-            "render_settings",
-            "hit_distance", 0.001);
+    Editor& editor = Editor::get_instance();
+    InternalLib& ilib = InternalLib::get_instance();
     
-    rmsb->max_ray_len = reader.GetReal(
-            "render_settings",
-            "max_ray_length", 500.0);
+    Config::Settings settings;
+    Config::read_values_before_init(ini_reader, &settings);
+
+    printf("ImGui Font:  '%s'\n", settings.imgui_font.c_str());
+    printf("Editor Font: '%s'\n", settings.editor_font.c_str());
+
+    rmsb->init(
+            settings.imgui_font.c_str(),
+            settings.editor_font.c_str()
+            );
     
-    rmsb->ao_step_size = reader.GetReal(
-            "render_settings",
-            "ao_step", 0.01);
-    
-    rmsb->ao_num_samples = reader.GetInteger(
-            "render_settings",
-            "ao_samples", 32);
-    
-    rmsb->ao_falloff = reader.GetReal(
-            "render_settings",
-            "ao_falloff", 3.0);
-    
-    rmsb->translucent_step_size = reader.GetReal(
-            "render_settings",
-            "translucent_step", 0.1);
+    Config::read_values_after_init(ini_reader, rmsb);
 
-
-    std::string res_str = reader.GetString(
-            "render_settings",
-            "render_resolution", "");
-    if(res_str.empty()) {
-        rmsb->loginfo(RED, "Could not find render resolution setting! Set to 'HALF'");
-        append_logfile(ERROR, "Could not find render resolution setting.");
-        res_str = "HALF";
-    }
-
-    int res_x = rmsb->monitor_width;
-    int res_y = rmsb->monitor_height;
-
-    if(res_str == "HALF") {
-        res_x /= 2;
-        res_y /= 2;
-    }
-    else
-    if(res_str == "LOW") {
-        res_x /= 3;
-        res_y /= 3;
-    }
-    if(res_str == "CUSTOM") {
-        res_x = reader.GetInteger(
-                "render_settings",
-                "custom_render_resolution_X", 0);
-        
-        res_y = reader.GetInteger(
-                "render_settings",
-                "custom_render_resolution_Y", 0);
-
-        if(res_x <= 0) {
-            rmsb->loginfo(RED, "Custom resolution X is invalid, set to half.");
-            append_logfile(ERROR, "Custom resolution X is invalid. Too small.");
-            res_x = rmsb->monitor_width/2;
-        }
-        if(res_y <= 0) {
-            rmsb->loginfo(RED, "Custom resolution Y is invalid, set to half.");
-            append_logfile(ERROR, "Custom resolution Y is invalid. Too small.");
-            res_y = rmsb->monitor_height/2;
-        }
-
-        if(res_x > rmsb->monitor_width) {
-            res_x = rmsb->monitor_width;
-        }
-        if(res_y > rmsb->monitor_height) {
-            res_y = rmsb->monitor_height;
-        }
-    }
-
-    rmsb->render_texture = rmsb->create_empty_texture(
-            res_x, res_y, GL_RGBA16F);
-    
-    SetTargetFPS(rmsb->fps_limit);
+    ilib.create_source();
+    rmsb->reload_shader();
 }
 
 int main(int argc, char** argv) {
@@ -205,9 +132,9 @@ int main(int argc, char** argv) {
     }
 
     assign_logfile("rmsb.log");
+
     const char* shader_filepath = argv[1];
     
-
     if(!FileExists(shader_filepath)) {
         create_template_shader(shader_filepath);
         append_logfile(INFO, "Shader \"%s\" did not exist. Created new template.",
@@ -222,21 +149,14 @@ int main(int argc, char** argv) {
     }
 
     Editor& editor = Editor::get_instance();
-    InternalLib& ilib = InternalLib::get_instance();
-
     RMSB rmsb;
     rmsb.shader_filepath = shader_filepath;
-    rmsb.init();
-    read_config(&rmsb);
-
-    ilib.create_source();
-    rmsb.reload_shader();
-
+    init_all(&rmsb);
     editor.title = shader_filepath;
-
     loop(&rmsb);
+
+    Editor::get_instance().quit();
     rmsb.quit();
-    editor.quit();
     close_logfile();
 
     return 0;

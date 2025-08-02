@@ -19,7 +19,7 @@ struct uniform_t;
 class RMSBGui {
     public:
 
-        void init();
+        void init(const char* font_filepath);
         void quit();
         void update();
         void render(RMSB* rmsb);

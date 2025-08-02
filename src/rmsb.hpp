@@ -44,16 +44,17 @@ enum Mode {
     EDIT_MODE
 };
 
-// TODO: Rename ??????
-struct texture_t {
-    uint32_t id;
-    int format;
-    int width;
-    int height;
+// Image index for RMSB::res.images
+enum ImageIdx : uint16_t {
+    EMPTY,
+    //...
 };
 
 // TODO: Something to debug the values?
 //
+
+#define RMSB_MAX_RESOURCE_IMAGES 8
+
 
 class RMSB {
     public:
@@ -61,7 +62,12 @@ class RMSB {
         
         Shader           output_shader;  // This shader is for drawing the texture compute shader created.
         uint32_t         compute_shader; // This shader is the user's controlled shader.
-        struct texture_t render_texture; // aka Output texture (TODO: Rename this?).
+        Texture render_texture; // aka Output texture (TODO: Rename this?).
+
+        struct resource_t {
+            Texture      images[RMSB_MAX_RESOURCE_IMAGES];
+            uint16_t num_images;
+        } res;
 
 
         // TODO: Add settings struct to make this more organized.
@@ -99,7 +105,8 @@ class RMSB {
         struct camera_t ray_camera;
         Camera          raster_camera;
 
-        void init();
+        void init(const char* imgui_font_ttf,
+                  const char* editor_font_ttf);
         void quit();
         void update();
 
@@ -107,8 +114,8 @@ class RMSB {
         // this is here because of it. (Not implemented yet).
         uint32_t         create_ssbo(int binding_point, size_t size);
      
-        struct texture_t create_empty_texture(int width, int height, int format);
-        void             delete_texture(struct texture_t* tex);
+        Texture create_empty_texture(int width, int height, int format);
+        void    delete_texture(Texture* tex);
 
         void render_3d();
         void render_shader();
@@ -133,7 +140,9 @@ class RMSB {
         void set_position_uniform_ptr(Uniform* ptr);
 
     private:
-    
+        void load_resources();
+        void load_resource_img(ImageIdx index, const char* path);
+
         bool m_user_hold_uniform_pos;
         int  m_user_hold_axis_i;
 

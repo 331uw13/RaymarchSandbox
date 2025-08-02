@@ -58,7 +58,7 @@ static bool str_contains(const std::string& str, size_t pos, const char* part, s
 void InternalLib::create_source() {
     this->source = "";
     this->documents.clear();
-    this->uniforms.clear();
+    this->clear_uniforms();
 
     add_info("About 'Material'"
             ,
@@ -243,6 +243,7 @@ const std::string InternalLib::get_source() {
         
 
 std::string InternalLib::get_uniform_code_line(Uniform* u) {
+    
     std::string code = "uniform ";
     code += UNIFORM_GLSL_TYPES_STR[u->type];
     code += " " + u->name;
@@ -274,6 +275,10 @@ void InternalLib::remove_uniform(Uniform* u) {
 
 void InternalLib::add_uniform(Uniform* u) {
     this->uniforms.push_back(*u);
+
+    if(u->type == UniformDataType::TEXTURE) {
+        return; // Textures are set to array in 'internal.glsl'
+    }
 
     std::string linebuf = "";
     int64_t found_index = -1;
@@ -308,4 +313,13 @@ void InternalLib::clear() {
 }
 
 
+void InternalLib::clear_uniforms() {
+    for(Uniform u : this->uniforms) {
+        if(u.has_texture) {
+            UnloadTexture(u.texture);
+        }
+    }
+
+    this->uniforms.clear();
+}
 

@@ -24,8 +24,10 @@ static const char* const g_keybinds[][32] = {
     { "Copy region to clipboard", "CTRL + C", "(Edit_Mode)" },
     { "Cut region to clipboard", "CTRL + D", "(Edit_Mode)" },
     { "Undo", "CTRL + Z", "(Edit_Mode)" },
-    { "", "", "" },
-    { "", "", "" },
+    { "Move one word right", "CTRL + RIGHT", "(Edit_Mode)" },
+    { "Move one word left", "CTRL + LEFT", "(Edit_Mode)" },
+    { "Move up until empty row", "CTRL + UP", "(Edit_Mode)" },
+    { "Move down until empty row", "CTRL + DOWN", "(Edit_Mode)" },
 };
    
 

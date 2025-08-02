@@ -23,6 +23,9 @@ uniform float AO_STEP_SIZE;
 uniform int AO_NUM_SAMPLES;
 uniform float AO_FALLOFF;
 
+uniform sampler2D TEXTURES[16];
+
+
 #define PI 3.14159
 #define PI2 (PI*2.0)
 #define PI_R (PI/180.0)
@@ -41,6 +44,7 @@ uniform float AO_FALLOFF;
 #define MreflectN(x)    x[2][1]
 #define Mopaque(x)      x[2][2]
 #define Mcanglow(x)     x[3][0]
+#define MtextureID(x)   x[3][1]
 
 
 vec3 FOG_COLOR = vec3(0.5, 0.5, 0.5);
@@ -128,10 +132,44 @@ FUNC Material EmptyMaterial()
                 1  // Opaque by default.
                 ),
             vec3(
-                0,
-                0,
-                0
+                0, // Do not keep track of closest material by default.
+                0, // No texture id by default.
+                0  // < Not used. >
                 ));
+}
+FUNC_END
+
+
+/* -INFO
+See https://iquilezles.org/articles/filteringrm/ for better details.
+
+*/
+FUNC vec3 TextureMapping(int texture_id, vec3 ray_pos, vec3 ray_dir, vec3 normal)
+{
+    vec2 res = imageSize(output_img);
+    vec2 id = vec2(gl_GlobalInvocationID.xy);
+
+    // Normalized screen-space coordinates.
+    vec2 px = (-res.xy + 2.0 * (id.xy + vec2(1.0, 0.0))) / res.y;
+    vec2 py = (-res.xy + 2.0 * (id.xy + vec2(0.0, 1.0))) / res.y;
+
+    vec3 cam = CameraInputPosition;
+
+    // Neighbor ray directions.
+    vec3 rdx = normalize(cam * vec3(px, cam.z));
+    vec3 rdy = normalize(cam * vec3(py, cam.z));
+    
+    // Screen-space derivatives.
+    vec3 dpdx = (Ray.len * (rdx * dot(ray_dir, normal) / dot(rdx, normal) - ray_dir));
+    vec3 dpdy = (Ray.len * (rdy * dot(ray_dir, normal) / dot(rdy, normal) - ray_dir));
+
+
+    vec3 m = pow(abs(normal), vec3(1.0));
+    vec4 x = textureGrad(TEXTURES[texture_id], ray_pos.yz, dpdx.yz, dpdy.yz);
+    vec4 y = textureGrad(TEXTURES[texture_id], ray_pos.zx, dpdx.zx, dpdy.zx);
+    vec4 z = textureGrad(TEXTURES[texture_id], ray_pos.xy, dpdx.xy, dpdy.xy);
+
+    return vec3(((x*m.x + y*m.y + z*m.z) / (m.x + m.y + m.z)));
 }
 FUNC_END
 
@@ -369,6 +407,10 @@ FUNC void Raymarch_I(vec3 ro, vec3 rd)
         }       
     }
 
+    if(MtextureID(Ray.mat) > 0) {
+        Mdiffuse(Ray.mat) = TextureMapping(int(round(MtextureID(Ray.mat)))-1, Ray.pos, rd, ComputeNormal(Ray.pos));
+    }
+
     Ray.solid_color += ApplyFog(raycolor(), Ray.len);
     //Ray.solid_color = ApplyFog(Ray.solid_color, Ray.len);
 }
@@ -400,27 +442,38 @@ FUNC float GetShadowExt(vec3 p, vec3 light_dir, float w, float max_value)
     Ray.pos = p;
     Ray.mat = Material(0);
 
+    float hit_opaque = 0.0;
     float ph = 1e20;
 
-    while(Ray.len < MAX_RAY_LENGTH) {
+    while(Ray.len < (MAX_RAY_LENGTH/2)) {
         Ray.pos = p + light_dir * Ray.len;
         Material c = map(Ray.pos);
+        float dist = Mdistance(c);
 
-        if(Mdistance(c) <= 0.0001) {
-            shadow = 0.0;
-            break;
+        if(Mopaque(c) > 0.001) {
+            if(dist <= 0.0001) {
+                shadow = 0.0;
+                hit_opaque = Mopaque(c);
+                break;
+            }
+
+            float h = Mdistance(c);
+            float y = h * h / (2.0 * ph);
+            float d = sqrt(h*h - y*y);
+            shadow = min(shadow, d/(w*max(0.0, Ray.len-y)));
+
+            ph = h;
+        }
+        else {
+            dist = 0.1;
+            ph = 0.1;
         }
 
-        float h = Mdistance(c);
-        float y = h * h / (2.0 * ph);
-        float d = sqrt(h*h - y*y);
-        shadow = min(shadow, d/(w*max(0.0, Ray.len-y)));
-
-        ph = h;
-
-        Ray.len += Mdistance(c);
+        Ray.len += dist;
     }
     Ray = old_ray;
+
+
     return clamp(shadow, max_value, 1.0);
 }
 FUNC_END
@@ -429,10 +482,8 @@ FUNC_END
 /* -INFO
 Return a shadow value for point 'p'
 For Light Point.
-Note: Using directional light position as 'light_pos'
-      will create unwanted results.
 */
-FUNC float GetShadow_LightPoint(vec3 p, vec3 light_pos, float w, float max_value)
+FUNC float GetShadow_Point(vec3 p, vec3 light_pos, float w, float max_value)
 {
     return GetShadowExt(p, normalize(light_pos - p), w, max_value);
 }
@@ -441,15 +492,12 @@ FUNC_END
 /* -INFO
 Return a shadow value for point 'p'
 For Directional Light.
-Note: Using light point position as 'light_pos'
-      will create unwanted results.
 */
-FUNC float GetShadow_LightDirectional(vec3 p, vec3 light_direction, float w, float max_value)
+FUNC float GetShadow_Direct(vec3 p, vec3 light_direction, float w, float max_value)
 {
     return GetShadowExt(p, normalize(light_direction), w, max_value);
 }
 FUNC_END
-
 
 
 vec3 Hash3(vec3 x);
@@ -589,6 +637,7 @@ FUNC vec3 LightPoint(vec3 eye, vec3 pos, vec3 color, float radius, float att, ve
 
     Ray.diffuse_value = diff;
 
+    diffuse *= color;
     diffuse *= a;
     specular *= a;
 

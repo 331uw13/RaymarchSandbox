@@ -7,7 +7,7 @@
 #include "util.hpp"
 #include "uniform_metadata.hpp"
 
-#define FONT_FILEPATH "./Px437_IBM_Model3x_Alt4.ttf"
+#define FONT_FILEPATH "./fonts/Px437_IBM_Model3x_Alt4.ttf"
 #define FONT_SPACING 1.0
 #define PADDING 3
 #define TAB_WIDTH 4  // See editor.hpp for max tab width.
@@ -32,13 +32,13 @@ static const int INPUT_KEYS[] = {
 #define IK_TAB 6
 
 
-void Editor::init() {
-    if(!FileExists(FONT_FILEPATH)) {
+void Editor::init(const char* font_filepath) {
+    if(!FileExists(font_filepath)) {
         fprintf(stderr, "\"%s\" Font file doesnt exist.\n",
-                FONT_FILEPATH);
+                font_filepath);
         return;
     }
-    font = LoadFont(FONT_FILEPATH);
+    font = LoadFont(font_filepath);
 
     m_background_color = (Color){ 20, 15, 12, 255 };
     m_margin_color     = (Color){ 34, 28, 26, 255 };
@@ -46,7 +46,10 @@ void Editor::init() {
     m_cursor_color = (Color){ 80, 200, 100, 255 };
     m_comment_color = (Color){ 120, 120, 120, 255 };
     m_selected_color = (Color){ 25, 55, 30, 255 };
-    
+    m_resize_area_idle_color = (Color){ 34, 28, 26, 255 };
+    m_resize_area_active_color = (Color){ 34, 120, 70, 255 };
+    m_resize_area_size = 12.0;
+
     this->has_focus = false;
     this->open = true;
     this->page_size = 40;
@@ -72,6 +75,7 @@ void Editor::init() {
     m_select.active = false;
     m_cursor_preferred_x = 0;
     m_undo_timer = 0;
+    m_resize_edge_active = ResizeEdge::NONE;
 
     this->undo_save_time = 3.0;
 
@@ -205,6 +209,39 @@ Color Editor::get_selectbg_color(int y) {
     return ColorFromHSV((float)y, 0.5, 0.3);
 }
 
+void Editor::draw_resize_edge_RIGHT(Color color) {
+    DrawRectangle(
+            m_pos.x + m_size.x - m_resize_area_size,
+            m_pos.y,
+            m_resize_area_size,
+            m_size.y,
+            color);
+
+    DrawRectangle(
+            m_pos.x + m_size.x - m_resize_area_size + 3,
+            m_pos.y + 3,
+            m_resize_area_size - 6,
+            m_size.y - m_resize_area_size - 6,
+            dim_color(color, 0.7));
+}
+
+void Editor::draw_resize_edge_BOTTOM(Color color) {
+    DrawRectangle(
+            m_pos.x,
+            m_pos.y + m_size.y - m_resize_area_size,
+            m_size.x,
+            m_resize_area_size,
+            color);
+
+    DrawRectangle(
+            m_pos.x + 3,
+            m_pos.y + m_size.y - m_resize_area_size + 3,
+            m_size.x - m_resize_area_size - 6,
+            m_resize_area_size - 6,
+            dim_color(color, 0.7));
+
+}
+
 void Editor::render(RMSB* rmsb) {
     if(!this->open) {
         return;
@@ -269,6 +306,27 @@ void Editor::render(RMSB* rmsb) {
     size_t data_visible = (m_scroll + this->page_size);
     data_visible = (data_visible > m_data.size()) ? m_data.size() : data_visible;
 
+    // Resize edges.
+    switch(m_resize_edge_active) {
+        case ResizeEdge::RIGHT:
+            draw_resize_edge_RIGHT(m_resize_area_active_color);
+            break;
+        
+        case ResizeEdge::BOTTOM:
+            draw_resize_edge_BOTTOM(m_resize_area_active_color);
+            break;
+
+        case ResizeEdge::RIGHT_CORNER:
+            draw_resize_edge_RIGHT(m_resize_area_active_color);
+            draw_resize_edge_BOTTOM(m_resize_area_active_color);
+            break;
+
+        case ResizeEdge::NONE:
+            draw_resize_edge_RIGHT(m_resize_area_idle_color);
+            draw_resize_edge_BOTTOM(m_resize_area_idle_color);
+            break;
+    }
+
 
     // Draw Selected region.
     draw_selected_reg();
@@ -286,11 +344,10 @@ void Editor::render(RMSB* rmsb) {
             m_cursor_color
             );
 
-    // Draw Data
     int text_y = 0;
     m_multiline_comment = false;
 
-
+    // Draw editor content.
     for(size_t i = m_scroll; i < data_visible; i++) {
         const std::string* line = &m_data[i];
         draw_text_glsl_syntax(line->c_str(), line->size(), m_margin, text_y);
@@ -346,7 +403,6 @@ void Editor::render(RMSB* rmsb) {
 
 
 void Editor::update_charsize() {
-
     int byte_count = 0;
     int codepoint = GetCodepointNext("#", &byte_count);
     int index = GetGlyphIndex(font, codepoint);
@@ -375,6 +431,12 @@ void Editor::start_selection() {
 }
 
 void Editor::handle_select_with_mouse() {
+    if(m_resize_edge_active != ResizeEdge::NONE) {
+        // Cursor may move and mouse left button is down 
+        // when resizing. Cancel selecting.
+        return;
+    }
+
     if(m_cursor_moved && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
         if(!m_select.active) {
             start_selection();
@@ -382,8 +444,7 @@ void Editor::handle_select_with_mouse() {
             // When select mode is started with a mouse
             // 'm_cursor_moved' must be used
             // but it will only notice the current Y position.
-            // and not where it actually should start so it must be fixed.
-
+            // and not where it actually should start.
             if(m_prev_cursor.x == cursor.x && m_prev_cursor.y != cursor.y) {
                 m_select.start_x = m_prev_cursor.x;
                 m_select.start_y = m_prev_cursor.y;
@@ -410,6 +471,69 @@ void Editor::handle_select_with_keys() {
     m_select.end_x = cursor.x;
     m_select.end_y = cursor.y;
 }
+    
+void Editor::update_resize_edge_possibility() {
+    Vector2 mouse = GetMousePosition();
+    
+    if(!this->mouse_hovered) {
+        return; // Only one axis can be checked.
+    }
+
+    
+    if(m_resize_edge_active != ResizeEdge::NONE) {
+        return; // Do not update already existing selected edge.
+    }
+    
+
+    bool right_edge = false;
+    bool bottom_edge = false;
+
+    // Horizontal.
+    if (mouse.x > (m_pos.x + m_size.x - m_resize_area_size)
+    && (mouse.x < (m_pos.x + m_size.x + m_resize_area_size * 2))) {
+        m_resize_edge_active = ResizeEdge::RIGHT;
+        right_edge = true;
+    }
+    
+    if (mouse.y > (m_pos.y + m_size.y - m_resize_area_size)
+    && (mouse.y < (m_pos.y + m_size.y + m_resize_area_size * 2))) {
+        m_resize_edge_active = ResizeEdge::BOTTOM;
+        bottom_edge = true;
+    }
+   
+    // Right and bottom overlap = Right corner.
+    if(right_edge && bottom_edge) {
+        m_resize_edge_active = ResizeEdge::RIGHT_CORNER;
+    }
+
+}
+
+void Editor::resize_editor_with_mouse() {
+    switch(m_resize_edge_active) {
+        case ResizeEdge::RIGHT:
+            m_size.x += GetMouseDelta().x;
+            break;
+
+        case ResizeEdge::BOTTOM:
+            m_size.y += GetMouseDelta().y;
+            this->page_size = m_size.y / m_charsize.y;
+
+            if(this->cursor.y - m_scroll >= this->page_size) {
+                move_cursor(0, -((this->cursor.y - m_scroll) - this->page_size) - 2);
+            }
+
+            break;
+
+        case ResizeEdge::RIGHT_CORNER:
+            m_size.x += GetMouseDelta().x;
+            m_size.y += GetMouseDelta().y;
+            this->page_size = m_size.y / m_charsize.y; 
+            break;
+
+
+        case ResizeEdge::NONE:break;
+    }
+}
 
 void Editor::update(RMSB* rmsb) {
     if(!this->open) {
@@ -423,7 +547,11 @@ void Editor::update(RMSB* rmsb) {
 
     this->has_focus = this->mouse_hovered;
 
+    update_resize_edge_possibility();
+
+
     if(this->mouse_hovered && IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
+        // Editor is moved by user.
         if(!m_grab_offset_set) {
             m_grab_offset_set = true;
             m_grab_offset.x = m_pos.x - mouse.x;
@@ -434,10 +562,18 @@ void Editor::update(RMSB* rmsb) {
         m_pos.y = mouse.y + m_grab_offset.y;
     }
     else
-    if(this->mouse_hovered && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        //this->has_focus = true;   
+    if(this->mouse_hovered && IsMouseButtonDown(MOUSE_LEFT_BUTTON)
+    && m_resize_edge_active == ResizeEdge::NONE) {           
+        // Move cursor to mouse position.
         cursor.x = (mouse.x - m_pos.x - (m_margin * m_charsize.x)) / m_charsize.x;
         cursor.y = (mouse.y - m_pos.y + (m_scroll * m_charsize.y)) / m_charsize.y; 
+    }
+    
+    if(IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        resize_editor_with_mouse();
+    }
+    else {
+        m_resize_edge_active = ResizeEdge::NONE;
     }
 
     if(this->has_focus) {
@@ -475,6 +611,8 @@ void Editor::update(RMSB* rmsb) {
     }
 
     m_background_color.a = this->opacity;
+    m_resize_area_idle_color.a = this->opacity;
+    m_resize_area_active_color.a = this->opacity;
     m_margin_color.a = this->opacity / 2;
 
     // Cursor blink
@@ -488,21 +626,21 @@ void Editor::update(RMSB* rmsb) {
     m_prev_cursor = cursor;
 
 
-    // Update timers.
 
     const float frame_dt = GetFrameTime();
     m_idle_timer += frame_dt;
    
+    // Auto reload.
     if(rmsb->auto_reload
     && (m_idle_timer >= rmsb->auto_reload_delay)) {
         m_idle_timer = 0;
         if(content_changed) {
-            //printf("RELOAD?\n");
             rmsb->reload_shader();
             reset_diff();
         }
     }
 
+    // Content difference check.
     m_diff_check_timer += frame_dt;
     if(m_diff_check_timer >= this->diff_check_delay) {
         m_diff_check_timer = 0;
@@ -892,7 +1030,7 @@ void Editor::clamp_cursor() {
     }
 }
 
-bool Editor::is_string_whitespace(std::string* str) {
+bool Editor::is_string_whitespace(const std::string* str) {
     bool ws = true;
 
     for(size_t i = 0; i < str->size(); i++) {
@@ -904,6 +1042,82 @@ bool Editor::is_string_whitespace(std::string* str) {
 
     return ws;
 }
+        
+void Editor::move_cursor_up_until_emptyrow() {
+    int64_t i = cursor.y-1;
+
+    bool empty_rows = false;
+
+    for(; i > 0; i--) {
+        std::string* line = get_line(i);
+        if(is_string_whitespace(line)) {
+            empty_rows = true;
+        }
+        else
+        if(empty_rows) {
+            break;
+        }
+    }
+
+    move_cursor_to(cursor.x, i);
+}
+
+
+void Editor::move_cursor_down_until_emptyrow() {
+    int64_t i = cursor.y;
+    bool empty_rows = false;
+    for(; i < (int64_t)m_data.size(); i++) {
+        std::string* line = get_line(i);
+        if(is_string_whitespace(line)) {
+            empty_rows = true;
+        }
+        else
+        if(empty_rows) {
+            break;
+        }
+    }
+    move_cursor_to(cursor.x, i);
+}
+
+
+void Editor::move_cursor_word_left() {
+    std::string* line = get_line(cursor.y);
+
+    bool white_space_hit = false;
+
+    int64_t i = cursor.x-1;
+    for(; i > 0; i--) {
+        if((*line)[i] == 0x20) {
+            white_space_hit = true;
+        }
+        else
+        if(white_space_hit) {
+            break;
+        }
+    }
+
+    move_cursor_to(i+1, cursor.y);
+}
+
+void Editor::move_cursor_word_right() {
+    std::string* line = get_line(cursor.y);
+   
+    bool white_space_hit = false;
+
+    int64_t i = cursor.x;
+    for(; i < (int64_t)line->size(); i++) {
+        if((*line)[i] == 0x20) {
+            white_space_hit = true;
+        }
+        else
+        if(white_space_hit) {
+            break;
+        }
+    }
+
+    move_cursor_to(i, cursor.y);
+}
+
 
 void Editor::move_cursor_to(int64_t x, int64_t y) {
    
@@ -1127,7 +1341,7 @@ void Editor::draw_rect(int x, int y, int w, int h, Color color) {
 }
 
 void Editor::draw_text(const char* text, float x, float y, Color color) {    
-    DrawTextEx(font, text, 
+    DrawTextEx(this->font, text, 
             (Vector2){
                 m_pos.x + x * m_charsize.x,
                 m_pos.y + y * m_charsize.y
@@ -1261,6 +1475,7 @@ void Editor::init_syntax_colors() {
     const int GLSL_FUNCTION = 0xED9632FF;
     const int INTERNAL = 0xA0C242FF;
     const int INTERNAL_TYPE = 0xBF8C56FF;
+    const int MATERIAL_MACRO = 0x769C3AFF;
     const int GLOBAL = 0x2C9633FF;
     const int PREPROC = 0x27C7D9FF;
     const int USER_FUNC = 0xD96FB7FF;
@@ -1271,7 +1486,8 @@ void Editor::init_syntax_colors() {
     m_color_map["raycolor_translucent"] = USER_FUNC;
     m_color_map["SetPixel"] = INTERNAL;
     m_color_map["GetFinalColor"] = INTERNAL;
-    m_color_map["GetShadow_LightPoint"] = INTERNAL;
+    m_color_map["GetShadow_Point"] = INTERNAL;
+    m_color_map["GetShadow_Direct"] = INTERNAL;
     m_color_map["AmbientOcclusion"] = INTERNAL;
     m_color_map["Material"] = INTERNAL_TYPE;
     m_color_map["SphereSDF"] = INTERNAL;
@@ -1285,13 +1501,14 @@ void Editor::init_syntax_colors() {
     m_color_map["#include"] = PREPROC;
     m_color_map["#define"] = PREPROC;
 
-    m_color_map["Mdiffuse"] = INTERNAL;
-    m_color_map["Mspecular"] = INTERNAL;
-    m_color_map["Mdistance"] = INTERNAL;
-    m_color_map["Mshine"] = INTERNAL;
-    m_color_map["MreflectN"] = INTERNAL;
-    m_color_map["Mopaque"] = INTERNAL;
-    m_color_map["Mcanglow"] = INTERNAL;
+    m_color_map["Mdiffuse"] = MATERIAL_MACRO;
+    m_color_map["Mspecular"] = MATERIAL_MACRO;
+    m_color_map["Mdistance"] = MATERIAL_MACRO;
+    m_color_map["Mshine"] = MATERIAL_MACRO;
+    m_color_map["MreflectN"] = MATERIAL_MACRO;
+    m_color_map["Mopaque"] = MATERIAL_MACRO;
+    m_color_map["Mcanglow"] = MATERIAL_MACRO;
+    m_color_map["MtextureID"] = MATERIAL_MACRO;
 
     m_color_map["EmptyMaterial"] = INTERNAL;
     m_color_map["MapValue"] = INTERNAL;

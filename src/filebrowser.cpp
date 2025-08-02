@@ -9,7 +9,7 @@
 #include "rmsb.hpp"
 
 
-void FileBrowserCallbacks::shader_selected(RMSB* rmsb, const File& file) {
+void FileBrowserCallbacks::shader_selected(RMSB* rmsb, const File& file, void* extptr) {
     Editor& editor = Editor::get_instance();
 
     if(editor.content_changed) {
@@ -27,6 +27,28 @@ void FileBrowserCallbacks::shader_selected(RMSB* rmsb, const File& file) {
     Editor::get_instance().load_file(file.path);
     rmsb->reload_state();
 }
+
+void FileBrowserCallbacks::texture_selected(RMSB* rmsb, const File& file, void* extptr) {
+    Uniform* uniform = (Uniform*)extptr;
+
+    if(uniform->has_texture) {
+        UnloadTexture(uniform->texture);
+        uniform->texture.id = 0;
+        uniform->has_texture = false;
+    }
+
+    uniform->texture = LoadTexture(file.path.c_str());
+    if(uniform->texture.id <= 0) {
+        rmsb->loginfo(RED, "Failed to load texture.");
+    }
+    else {
+        uniform->has_texture = true;
+    }
+
+}
+
+
+
 
 
 static constexpr ImVec4 FILE_COLORS[] = {
@@ -115,9 +137,10 @@ void FileBrowser::open(const std::string  directory,
 }
 
  
-void FileBrowser::register_task_callback(void(*callback)(RMSB*, const File&)) {
+void FileBrowser::register_task_callback(void(*callback)(RMSB*, const File&, void*), void* extptr) {
     m_task_callback = callback;
     m_current_dir = std::filesystem::absolute(std::filesystem::current_path());
+    m_task_callback_extptr = extptr;
 }
  
 void FileBrowser::render(RMSB* rmsb) {
@@ -152,7 +175,7 @@ void FileBrowser::render(RMSB* rmsb) {
         }
 
         // Save callback address because 'FileBrowser::open' will clear it.
-        void(*callback)(RMSB*, const File&) = m_task_callback;
+        void(*callback)(RMSB*, const File&, void*) = m_task_callback;
         this->open(parent, m_task_name, m_favor_ext);
         m_task_callback = callback;
     }
@@ -182,11 +205,11 @@ void FileBrowser::render(RMSB* rmsb) {
                 }
 
                 // Call registered task.
-                m_task_callback(rmsb, file);
+                m_task_callback(rmsb, file, m_task_callback_extptr);
             }
             else
             if(file.type == FileType::DIRECTORY) {
-                void(*callback)(RMSB*, const File&) = m_task_callback;
+                void(*callback)(RMSB*, const File&, void*) = m_task_callback;
                 this->open(file.path, m_task_name, m_favor_ext);
                 m_task_callback = callback;
                 break;
