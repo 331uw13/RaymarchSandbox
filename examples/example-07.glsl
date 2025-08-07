@@ -91,7 +91,7 @@ vec3 raycolor() {
     vec3 ambient = Mdiffuse(Ray.mat) * 0.1;
     color = light + ambient;
     
-    color *= GetShadow_LightPoint(Ray.pos, light_pos, 0.5, 0.1);
+    color *= GetShadow_Point(Ray.pos, light_pos, 0.5, 0.1);
     return color;
 }
 
