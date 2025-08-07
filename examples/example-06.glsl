@@ -88,7 +88,7 @@ vec3 raycolor() {
     color = Mdiffuse(Ray.mat);
     color = light + ambient;
     
-    color *= GetShadow_LightPoint(Ray.pos, light_pos, 0.5, 0.3);
+    color *= GetShadow_Point(Ray.pos, light_pos, 0.5, 0.3);
     
     int   ao_samples = 32;
     float ao_falloff = 3.0;
