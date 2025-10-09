@@ -62,6 +62,10 @@ translucent_step = 0.1
 render_resolution = FULL
 custom_render_resolution_X = 0
 custom_render_resolution_Y = 0
+
+[font_settings]
+imgui_font = ./fonts/AdwaitaSans-Regular.ttf
+editor_font = ./fonts/Px437_IBM_Model3x_Alt4.ttf
 ```
 * `render_resolution` Options: FULL, HALF or CUSTOM
 
